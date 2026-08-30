@@ -1,0 +1,108 @@
+name: Build onlinestream extensions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/onlinestream/**/payload.ts"
+      - "src/_shared/**"
+      - "bundle.ts"
+  pull_request:
+    paths:
+      - "src/onlinestream/**/payload.ts"
+      - "src/_shared/**"
+      - "bundle.ts"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Determine concerned extensions
+        id: concerned
+        run: |
+          ALL_DIRS=$(find src/onlinestream -name payload.ts -exec dirname {} \; | sort -u)
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          elif git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+            CHANGED_FILES=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+          else
+            CHANGED_FILES=""
+          fi
+
+          if [ -z "$CHANGED_FILES" ] || echo "$CHANGED_FILES" | grep -qE '^(src/_shared/|bundle\.ts)'; then
+            DIRS="$ALL_DIRS"
+          else
+            DIRS=$(echo "$CHANGED_FILES" | grep -oE 'src/onlinestream/.+/payload\.ts' | xargs -r -n1 dirname | sort -u)
+          fi
+
+          echo "dirs<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$DIRS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          MANIFESTS=$(echo "$DIRS" | sed '/^$/d' | awk '{print $0"/manifest.json"}' | tr '\n' ' ')
+          echo "manifests=$MANIFESTS" >> "$GITHUB_OUTPUT"
+
+      - name: Build all extensions
+        run: npx tsx bundle.ts
+
+      - name: Check no leftover imports in manifest payloads
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+
+            function findManifests(dir) {
+              return fs.readdirSync(dir).flatMap((entry) => {
+                const full = path.join(dir, entry);
+                if (!fs.statSync(full).isDirectory()) return [];
+                const manifestPath = path.join(full, "manifest.json");
+                return fs.existsSync(manifestPath) ? [manifestPath] : findManifests(full);
+              });
+            }
+
+            let failed = false;
+            for (const manifestPath of findManifests("src/onlinestream")) {
+              const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+              if (/^\s*(import|export)\s/m.test(manifest.payload || "")) {
+                console.error(`::error::${manifestPath} contains a payload with import/export`);
+                failed = true;
+              }
+            }
+            if (failed) process.exit(1);
+          '
+
+      - name: Check for manifest changes on concerned extensions
+        if: github.event_name == 'push'
+        id: diff
+        run: |
+          if [ -n "${{ steps.concerned.outputs.manifests }}" ] && ! git diff --quiet -- ${{ steps.concerned.outputs.manifests }}; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated manifests
+        if: github.event_name == 'push' && steps.diff.outputs.changed == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: rebuild manifest.json for updated extensions"
+          file_pattern: ${{ steps.concerned.outputs.manifests }}

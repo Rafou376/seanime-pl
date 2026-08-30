@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "strict": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "types": ["node"]
+    },
+    "include": ["src/onlinestream/**/payload.ts", "src/_shared/**/*.ts", "src/_shared/**/*.d.ts", "bundle.ts"]
+}
