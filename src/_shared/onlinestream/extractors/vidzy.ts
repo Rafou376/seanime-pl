@@ -1,7 +1,6 @@
 import type { ExtractorResult } from "./types";
 import { getInputValue, getLinkHrefByClass } from "../utils/html";
 
-const API_URL = "https://vidzy.live/d";
 const VIDEO_ID_RE = /(?:embed-|\/v\/\d+\/\d+\/)([a-zA-Z0-9]+)/;
 
 export async function extractVidzy(playerUrl: string, label: string): Promise<ExtractorResult> {
@@ -9,7 +8,8 @@ export async function extractVidzy(playerUrl: string, label: string): Promise<Ex
         const videoId = playerUrl.match(VIDEO_ID_RE)?.[1];
         if (!videoId) return { sources: [] };
 
-        const targetUrl = `${API_URL}/${videoId}_n`;
+        const origin = new URL(playerUrl).origin;
+        const targetUrl = `${origin}/d/${videoId}_n`;
 
         const res1 = await fetch(targetUrl);
         if (!res1.ok) return { sources: [] };
