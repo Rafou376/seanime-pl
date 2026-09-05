@@ -4,7 +4,7 @@
     "id": "french-stream",
     "name": "French Stream",
     "author": "Rafou376",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "lang": "fr",
     "description": "French Stream est une plateforme de streaming supportant séries et films",
     "manifestURI": "https://raw.githubusercontent.com/rafou376/seanime-pl/main/src/onlinestream/french-stream/manifest.json",

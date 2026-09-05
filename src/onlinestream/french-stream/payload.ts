@@ -72,9 +72,13 @@ class Provider {
         let headers: { [key: string]: string } = {};
 
         if (selectedServer) {
-            for (const entry of serversMap[selectedServer]) {
-                if (!entry.url) continue;
-                const result = await extract(selectedServer, entry.url, entry.version.toUpperCase());
+            const results = await Promise.all(
+                serversMap[selectedServer]
+                    .filter((entry) => entry.url)
+                    .map((entry) => extract(selectedServer, entry.url, entry.version.toUpperCase())),
+            );
+
+            for (const result of results) {
                 videoSources.push(...result.sources);
                 if (result.headers) headers = { ...headers, ...result.headers };
             }
