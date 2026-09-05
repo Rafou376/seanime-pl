@@ -87,7 +87,7 @@ class Provider {
         const json = (await this.fetchJson(`${baseUrl}/ep-data.php?id=${episodeInfo.id}`)) ?? {};
         const map: Record<string, { url: string; version: string }[]> = {};
 
-        for (const version of ["vostfr", "vf", "vo"]) {
+        for (const version of Object.keys(json)) {
             const servers = json[version]?.[episodeInfo.num] ?? {};
 
             for (const [name, url] of Object.entries(servers)) {
@@ -107,9 +107,13 @@ class Provider {
         for (const [name, versions] of Object.entries(players)) {
             if (name === "premium") continue;
 
-            for (const version of ["vostfr", "vff", "vfq", "default"]) {
-                const url = (versions as Record<string, string>)[version];
-                if (url) (map[name] ??= []).push({ url, version: version === "default" ? "VO" : version });
+            const versionMap = versions as Record<string, string>;
+
+            for (const [version, url] of Object.entries(versionMap)) {
+                if (!url) continue;
+                if (version === "default" && Object.entries(versionMap).some(([v, u]) => v !== "default" && u === url)) continue;
+
+                (map[name] ??= []).push({ url, version: version === "default" ? "VO" : version });
             }
         }
 
