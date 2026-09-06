@@ -1,4 +1,3 @@
-import type { ExtractorResult } from "./types";
 import { getInputValue, getLinkHrefByClass } from "../utils/html";
 import { wait } from "../utils/timing";
 

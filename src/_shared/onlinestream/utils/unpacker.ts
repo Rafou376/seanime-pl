@@ -1,4 +1,3 @@
-
 // Decodes a script obfuscated with the "Dean Edwards Packer"
 export function unpack(p: string, a: number, c: number, k: string[]): string {
     while (c--) {

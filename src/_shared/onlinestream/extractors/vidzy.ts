@@ -1,4 +1,3 @@
-import type { ExtractorResult } from "./types";
 import { getInputValue, getLinkHrefByClass } from "../utils/html";
 
 const VIDEO_ID_RE = /(?:embed-|\/v\/\d+\/\d+\/)([a-zA-Z0-9]+)/;

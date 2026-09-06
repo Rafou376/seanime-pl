@@ -1,12 +1,5 @@
-import type { Extractor, ExtractorResult } from "./types";
 import { extractGeneric } from "./generic";
-import { extractVidzy } from "./vidzy";
-import { extractUqload } from "./uqload";
-
-const EXTRACTORS: Record<string, Extractor> = {
-    vidzy: extractVidzy,
-    uqload: extractUqload
-};
+import { EXTRACTORS } from "virtual:extractors-map";
 
 export async function extract(serverName: string, playerUrl: string, label: string): Promise<ExtractorResult> {
     const name = serverName.toLowerCase();
@@ -29,5 +22,3 @@ export async function extract(serverName: string, playerUrl: string, label: stri
 
     return { ...result, sources };
 }
-
-export type { ExtractorResult } from "./types";

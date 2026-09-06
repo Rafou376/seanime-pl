@@ -8,5 +8,5 @@
         "noEmit": true,
         "types": ["node"]
     },
-    "include": ["src/onlinestream/**/payload.ts", "src/_shared/**/*.ts", "src/_shared/**/*.d.ts", "bundle.ts"]
+    "include": ["src/onlinestream/**/payload.ts", "src/_shared/**/*.ts", "src/_shared/**/*.d.ts", "bundle.ts", "scripts/**/*.ts"]
 }
