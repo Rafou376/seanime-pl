@@ -1,21 +1,11 @@
 import * as esbuild from "esbuild";
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { DOMAINS, findExtensionDirs, domainForDir } from "./scripts/domains";
 
-const ROOT = "src/onlinestream";
-const EXTRACTORS_DIR = "src/_shared/onlinestream/extractors";
-const REGISTRY_PATH = "src/_shared/onlinestream/registry.json";
-const REGISTRY: Record<string, { file: string; export: string }> = JSON.parse(readFileSync(REGISTRY_PATH, "utf-8"));
+function virtualExtractorsMapPlugin(registryPath: string, extractorsDir: string, allowed: string[]): esbuild.Plugin {
+    const registry: Record<string, { file: string; export: string }> = JSON.parse(readFileSync(registryPath, "utf-8"));
 
-function findExtensionDirs(dir: string): string[] {
-    return readdirSync(dir).flatMap((entry) => {
-        const full = join(dir, entry);
-        if (!statSync(full).isDirectory()) return [];
-        return existsSync(join(full, "payload.ts")) ? [full] : findExtensionDirs(full);
-    });
-}
-
-function virtualExtractorsMapPlugin(allowed: string[]): esbuild.Plugin {
     return {
         name: "virtual-extractors-map",
         setup(build) {
@@ -25,13 +15,13 @@ function virtualExtractorsMapPlugin(allowed: string[]): esbuild.Plugin {
             }));
             build.onLoad({ filter: /.*/, namespace: "virtual-extractors-map" }, () => {
                 const contents = [
-                    ...allowed.map((id) => `import { ${REGISTRY[id].export} } from "./${REGISTRY[id].file}";`),
+                    ...allowed.map((id) => `import { ${registry[id].export} } from "./${registry[id].file}";`),
                     `export const EXTRACTORS = {`,
-                    ...allowed.map((id) => `    ${id}: ${REGISTRY[id].export},`),
+                    ...allowed.map((id) => `    ${id}: ${registry[id].export},`),
                     `};`,
                 ].join("\n");
 
-                return { contents, loader: "ts", resolveDir: EXTRACTORS_DIR };
+                return { contents, loader: "ts", resolveDir: extractorsDir };
             });
         },
     };
@@ -41,10 +31,19 @@ function stripPathComments(code: string): string {
     return code.replace(/^\/\/ .+\.tsx?\n/gm, "");
 }
 
+function stripExports(code: string): string {
+    return code
+        .replace(/export\s*\{[^}]*\}\s*;?\s*/g, "")
+        .replace(/^export (?=(class|function|const|let|var)\s)/gm, "");
+}
+
 async function buildExtension(dir: string) {
+    const domain = domainForDir(dir);
     const manifestPath = join(dir, "manifest.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
     const allowed: string[] = manifest.extractors ?? [];
+
+    const plugins = manifest.extractors ? [virtualExtractorsMapPlugin(domain.registryPath, domain.itemsDir, allowed)] : [];
 
     const result = await esbuild.build({
         entryPoints: [join(dir, "payload.ts")],
@@ -52,11 +51,12 @@ async function buildExtension(dir: string) {
         write: false,
         target: "es2020",
         platform: "neutral",
-        plugins: [virtualExtractorsMapPlugin(allowed)],
+        treeShaking: true,
+        plugins,
     });
 
-    const referenceHeader = `/// <reference path="./_shared/onlinestream/online-streaming-provider.d.ts" />\n`;
-    const bundledCode = referenceHeader + stripPathComments(result.outputFiles[0].text);
+    const referenceHeader = `/// <reference path="${domain.declaration}" />\n`;
+    const bundledCode = referenceHeader + stripExports(stripPathComments(result.outputFiles[0].text));
 
     manifest.payload = bundledCode;
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 4) + "\n");
@@ -66,10 +66,10 @@ async function buildExtension(dir: string) {
 
 async function main() {
     const requested = process.argv.slice(2).filter(Boolean);
-    const dirs = requested.length > 0 ? requested : findExtensionDirs(ROOT);
+    const dirs = requested.length > 0 ? requested : DOMAINS.flatMap((domain) => findExtensionDirs(domain.root));
 
     if (dirs.length === 0) {
-        console.log(`No extensions found (no payload.ts under ${ROOT}/).`);
+        console.log(`No extensions found (no payload.ts under ${DOMAINS.map((d) => d.root).join(", ")}).`);
         return;
     }
 

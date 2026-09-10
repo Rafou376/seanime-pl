@@ -1,18 +1,11 @@
-import { readFileSync, readdirSync, statSync, existsSync } from "fs";
+import { readFileSync } from "fs";
 import { join } from "path";
-
-function findManifests(dir: string): string[] {
-    return readdirSync(dir).flatMap((entry) => {
-        const full = join(dir, entry);
-        if (!statSync(full).isDirectory()) return [];
-        const manifestPath = join(full, "manifest.json");
-        return existsSync(manifestPath) ? [manifestPath] : findManifests(full);
-    });
-}
+import { DOMAINS, findExtensionDirs } from "./domains";
 
 let failed = false;
 
-for (const manifestPath of findManifests("src/onlinestream")) {
+for (const dir of DOMAINS.flatMap((domain) => findExtensionDirs(domain.root))) {
+    const manifestPath = join(dir, "manifest.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
     const payload = manifest.payload ?? "";
 

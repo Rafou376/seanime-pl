@@ -1,15 +1,17 @@
-name: Build onlinestream extensions
+name: Build extensions
 
 on:
   push:
     branches: [main]
     paths:
       - "src/onlinestream/**/payload.ts"
+      - "src/manga/**/payload.ts"
       - "src/_shared/**"
       - "bundle.ts"
   pull_request:
     paths:
       - "src/onlinestream/**/payload.ts"
+      - "src/manga/**/payload.ts"
       - "src/_shared/**"
       - "bundle.ts"
 

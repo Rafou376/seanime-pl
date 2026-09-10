@@ -3,7 +3,7 @@ import { extract } from "../../_shared/onlinestream/extractors";
 
 const baseUrl = "https://french-stream.one";
 
-class Provider {
+export class Provider {
     private static readonly MAX_SERVERS = 10;
 
     getSettings(): Settings {

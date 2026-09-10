@@ -1,0 +1,8 @@
+{
+    "extends": "./tsconfig.json",
+    "include": [
+        "src/manga/**/payload.ts",
+        "src/_shared/manga/**/*.ts",
+        "src/_shared/manga/**/*.d.ts"
+    ]
+}

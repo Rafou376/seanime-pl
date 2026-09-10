@@ -2,7 +2,7 @@
     "name": "seanime-extensions",
     "private": true,
     "scripts": {
-        "typecheck": "tsc --noEmit",
+        "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.manga.json",
         "build": "npx tsx bundle.ts"
     },
     "devDependencies": {

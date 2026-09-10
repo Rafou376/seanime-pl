@@ -1,18 +1,9 @@
 import { execSync } from "child_process";
-import { readFileSync, readdirSync, statSync, existsSync } from "fs";
+import { readFileSync } from "fs";
 import { join, basename } from "path";
+import { DOMAINS, Domain, declaredIds, findExtensionDirs } from "./domains";
 
 const diffSpec = process.argv.slice(2).join(" ");
-
-function findExtensionDirs(dir: string): string[] {
-    return readdirSync(dir).flatMap((entry) => {
-        const full = join(dir, entry);
-        if (!statSync(full).isDirectory()) return [];
-        return existsSync(join(full, "payload.ts")) ? [full] : findExtensionDirs(full);
-    });
-}
-
-const allDirs = findExtensionDirs("src/onlinestream").sort();
 
 let changedFiles: string[] = [];
 if (diffSpec) {
@@ -27,35 +18,40 @@ function printAndExit(dirs: string[]) {
     console.log(Array.from(new Set(dirs)).sort().join("\n"));
 }
 
-if (changedFiles.length === 0) {
+const allDirs = DOMAINS.flatMap((domain) => findExtensionDirs(domain.root)).sort();
+
+if (changedFiles.length === 0 || changedFiles.includes("bundle.ts")) {
     printAndExit(allDirs);
     process.exit(0);
 }
 
-const extractorsDir = "src/_shared/onlinestream/extractors";
-const changedExtractors = changedFiles
-    .filter((f) => f.startsWith(`${extractorsDir}/`) && f.endsWith(".ts"))
-    .map((f) => basename(f, ".ts"))
-    .filter((id) => id !== "types" && id !== "index");
+function concernedForDomain(domain: Domain): string[] {
+    const dirs = findExtensionDirs(domain.root);
 
-const otherSharedChanged = changedFiles.some(
-    (f) => f.startsWith("src/_shared/") && !f.startsWith(`${extractorsDir}/`),
-);
+    const changedItems = changedFiles
+        .filter((f) => f.startsWith(`${domain.itemsDir}/`) && f.endsWith(".ts"))
+        .map((f) => basename(f, ".ts"))
+        .filter((id) => id !== "types" && id !== "index");
 
-if (otherSharedChanged || changedFiles.includes("bundle.ts") || changedExtractors.includes("generic")) {
-    printAndExit(allDirs);
-    process.exit(0);
+    const otherSharedChanged = changedFiles.some((f) => f.startsWith(`${domain.sharedRoot}/`) && !f.startsWith(`${domain.itemsDir}/`));
+    const hasAlwaysConcernedChange = domain.alwaysConcerned?.some((id) => changedItems.includes(id)) ?? false;
+
+    if (otherSharedChanged || hasAlwaysConcernedChange) {
+        return dirs;
+    }
+
+    const directlyChangedDirs = changedFiles
+        .map((f) => f.match(new RegExp(`^(${domain.root}/.+)/(?:payload\\.ts|manifest\\.json)$`))?.[1])
+        .filter((dir): dir is string => Boolean(dir));
+
+    const dependentDirs = dirs.filter((dir) => {
+        if (changedItems.length === 0) return false;
+        const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+        const declared = declaredIds(manifest, domain.manifestField);
+        return changedItems.some((id) => declared.includes(id));
+    });
+
+    return [...directlyChangedDirs, ...dependentDirs];
 }
 
-const directlyChangedDirs = changedFiles
-    .map((f) => f.match(/^(src\/onlinestream\/.+)\/(?:payload\.ts|manifest\.json)$/)?.[1])
-    .filter((dir): dir is string => Boolean(dir));
-
-const dependentDirs = allDirs.filter((dir) => {
-    if (changedExtractors.length === 0) return false;
-    const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
-    const declared: string[] = manifest.extractors ?? [];
-    return changedExtractors.some((id) => declared.includes(id));
-});
-
-printAndExit([...directlyChangedDirs, ...dependentDirs]);
+printAndExit(DOMAINS.flatMap(concernedForDomain));

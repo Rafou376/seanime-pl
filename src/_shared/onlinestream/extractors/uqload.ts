@@ -1,5 +1,5 @@
-import { getInputValue, getLinkHrefByClass } from "../utils/html";
-import { wait } from "../utils/timing";
+import { getInputValue, getLinkHrefByClass } from "../../utils/html";
+import { wait } from "../../utils/timing";
 
 const VIDEO_ID_RE = /(?:embed-|\/d\/)([a-zA-Z0-9_-]+)/;
 
