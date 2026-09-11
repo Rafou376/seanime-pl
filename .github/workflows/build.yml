@@ -69,7 +69,9 @@ jobs:
           echo "manifests=$MANIFESTS" >> "$GITHUB_OUTPUT"
 
       - name: Build concerned extensions
-        run: npx tsx bundle.ts ${{ steps.concerned.outputs.dirs }}
+        run: |
+          DIRS="${{ steps.concerned.outputs.dirs }}"
+          npx tsx bundle.ts $DIRS
 
       - name: Check manifest payloads
         run: npx tsx scripts/check-payloads.ts
