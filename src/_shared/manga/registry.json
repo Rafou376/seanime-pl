@@ -1,5 +1,8 @@
 {
     "origines": {
         "version": "1.0.0"
+    },
+    "libgroup": {
+        "version": "1.0.0"
     }
 }
