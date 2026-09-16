@@ -4,5 +4,8 @@
     },
     "libgroup": {
         "version": "1.0.0"
+    },
+    "grouple": {
+        "version": "1.0.0"
     }
 }
