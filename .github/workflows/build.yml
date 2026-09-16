@@ -92,3 +92,4 @@ jobs:
         with:
           commit_message: "chore: rebuild manifest.json for updated extensions"
           file_pattern: ${{ steps.concerned.outputs.manifests }}
+          commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
