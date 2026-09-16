@@ -1,5 +1,5 @@
 {
-    "name": "seanime-extensions",
+    "name": "seanime-pl",
     "private": true,
     "scripts": {
         "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.manga.json",
