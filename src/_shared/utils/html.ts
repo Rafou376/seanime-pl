@@ -165,11 +165,35 @@ export function getImageUrl(html: string, tag: string = "img"): string | null {
     return match?.[1] ?? null;
 }
 
-function stripTags(html: string): string {
+export function stripTags(html: string): string {
     return html
         .replace(/<[^>]+>/g, " ")
         .replace(/&amp;/g, "&")
         .replace(/&nbsp;/g, " ")
         .replace(/\s+/g, " ")
         .trim();
+}
+
+export function absUrl(path: string, baseUrl: string): string {
+    try {
+        return new URL(path, baseUrl).toString();
+    } catch {
+        return path;
+    }
+}
+
+export function chapterOrderValue(chapter: string): number {
+    const value = parseFloat(chapter);
+    return Number.isNaN(value) ? Number.POSITIVE_INFINITY : value;
+}
+
+export function scriptContaining(html: string, needle: string): string | null {
+    const re = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = re.exec(html)) !== null) {
+        if (match[1].includes(needle)) return match[1];
+    }
+
+    return null;
 }

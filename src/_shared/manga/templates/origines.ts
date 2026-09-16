@@ -1,4 +1,4 @@
-import { getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix } from "../../utils/html";
+import { absUrl, chapterOrderValue, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix } from "../../utils/html";
 
 type SearchResponse = {
     success: boolean;
@@ -50,7 +50,7 @@ export abstract class Origines {
             .map((item) => ({
                 id: this.toMangaSlug(item.url),
                 title: item.title,
-                image: item.thumb ? this.absUrl(item.thumb) : undefined,
+                image: item.thumb ? absUrl(item.thumb, this.baseUrl) : undefined,
             }));
     }
 
@@ -104,14 +104,6 @@ export abstract class Origines {
         return this.splitSegments(path).pop();
     }
 
-    private absUrl(url: string): string {
-        try {
-            return new URL(url, this.baseUrl).toString();
-        } catch {
-            return url;
-        }
-    }
-
     private parseChapters(html: string, mangaId: string): ChapterDetails[] {
         const chapters: Omit<ChapterDetails, "index">[] = [];
 
@@ -128,7 +120,7 @@ export abstract class Origines {
 
             chapters.push({
                 id,
-                url: this.absUrl(`${this.mangaPath}/${id}/`),
+                url: absUrl(`${this.mangaPath}/${id}/`, this.baseUrl),
                 title: name,
                 chapter: this.chapterNumber(name),
                 updatedAt: this.parseChapterDate(dateTitle),
@@ -136,13 +128,8 @@ export abstract class Origines {
         }
 
         return chapters
-            .sort((a, b) => this.chapterOrderValue(a.chapter) - this.chapterOrderValue(b.chapter))
+            .sort((a, b) => chapterOrderValue(a.chapter) - chapterOrderValue(b.chapter))
             .map((chapter, index) => ({ ...chapter, index }));
-    }
-
-    private chapterOrderValue(chapter: string): number {
-        const value = parseFloat(chapter);
-        return Number.isNaN(value) ? Number.POSITIVE_INFINITY : value;
     }
 
     private parsePages(chapterHtml: string): ChapterPage[] {
@@ -152,7 +139,7 @@ export abstract class Origines {
             .map((block) => getImageUrl(block)?.trim())
             .filter((url): url is string => !!url)
             .map((url, index) => ({
-                url: this.absUrl(url),
+                url: absUrl(url, this.baseUrl),
                 index,
                 headers: { Referer: referer },
             }));
