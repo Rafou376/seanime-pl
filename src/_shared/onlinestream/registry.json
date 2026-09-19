@@ -1,9 +1,4 @@
 {
-    "generic": {
-        "version": "1.0.0",
-        "file": "generic",
-        "export": "extractGeneric"
-    },
     "vidzy": {
         "version": "1.0.0",
         "file": "vidzy",

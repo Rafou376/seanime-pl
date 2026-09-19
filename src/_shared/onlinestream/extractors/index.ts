@@ -1,11 +1,12 @@
-import { extractGeneric } from "./generic";
 import { EXTRACTORS } from "virtual:extractors-map";
 
 export async function extract(serverName: string, playerUrl: string, label: string): Promise<ExtractorResult> {
     const name = serverName.toLowerCase();
     const extractor = Object.entries(EXTRACTORS).find(([key]) => name.includes(key))?.[1];
 
-    const result = await (extractor ?? extractGeneric)(playerUrl, label);
+    if (!extractor) return { sources: [] };
+
+    const result = await extractor(playerUrl, label);
 
     const sources = (
         await Promise.all(

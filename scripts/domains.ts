@@ -19,7 +19,6 @@ export const DOMAINS: Domain[] = [
         itemsDir: "src/_shared/onlinestream/extractors",
         registryPath: "src/_shared/onlinestream/registry.json",
         manifestField: "extractors",
-        alwaysConcerned: ["generic"],
     },
     {
         root: "src/manga",
