@@ -1,7 +1,7 @@
 /// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
 import { extract } from "../../_shared/onlinestream/extractors";
 
-const baseUrl = "https://french-stream.one";
+const baseUrl = "https://french-stream.net";
 
 export class Provider {
     private static readonly MAX_SERVERS = 10;
