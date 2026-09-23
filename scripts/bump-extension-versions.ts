@@ -27,9 +27,17 @@ for (const domain of DOMAINS) {
     const oldRegistry = JSON.parse(showAt(base, domain.registryPath) ?? "{}");
     const newRegistry = JSON.parse(readFileSync(domain.registryPath, "utf-8"));
 
-    const bumped = Object.keys(newRegistry).filter(
-        (id) => oldRegistry[id]?.version !== undefined && oldRegistry[id].version !== newRegistry[id].version,
-    );
+    const bumped = Object.keys(newRegistry).filter((id) => {
+        const oldVersion = oldRegistry[id]?.version;
+        const newVersion = newRegistry[id]?.version;
+
+        return (
+            Number.isInteger(oldVersion) &&
+            Number.isInteger(newVersion) &&
+            oldVersion > 0 &&
+            newVersion > oldVersion
+        );
+    });
 
     if (bumped.length === 0) continue;
 

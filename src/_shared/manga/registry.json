@@ -1,11 +1,11 @@
 {
     "origines": {
-        "version": "1.0.0"
+        "version": 1
     },
     "libgroup": {
-        "version": "1.0.0"
+        "version": 1
     },
     "grouple": {
-        "version": "1.0.0"
+        "version": 1
     }
 }

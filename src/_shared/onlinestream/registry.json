@@ -1,11 +1,11 @@
 {
     "vidzy": {
-        "version": "1.0.0",
+        "version": 1,
         "file": "vidzy",
         "export": "extractVidzy"
     },
     "uqload": {
-        "version": "1.0.0",
+        "version": 1,
         "file": "uqload",
         "export": "extractUqload"
     }
