@@ -1,14 +1,29 @@
 /// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
 import { extract } from "../../_shared/onlinestream/extractors";
+import { episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
 
 const baseUrl = "https://french-stream.net";
+
+type EpisodeId = {
+    id: string;
+    type: "movie"
+} | {
+    id: string;
+    type: "tv";
+    num: string
+};
+
+type ServerEntry = {
+    url: string;
+    version: string
+};
 
 export class Provider {
     private static readonly MAX_SERVERS = 10;
 
     getSettings(): Settings {
         return {
-            episodeServers: Array.from({ length: Provider.MAX_SERVERS }, (_, i) => `Server ${i + 1}`),
+            episodeServers: episodeServerList(Provider.MAX_SERVERS),
             supportsDub: true,
         };
     }
@@ -59,43 +74,23 @@ export class Provider {
     }
 
     async findEpisodeServer(episode: EpisodeDetails, server: string): Promise<EpisodeServer> {
-        const episodeInfo = JSON.parse(episode.id);
+        const episodeInfo = JSON.parse(episode.id) as EpisodeId;
         const serversMap = episodeInfo.type === "tv"
             ? await this.getTvServers(episodeInfo)
             : await this.getMovieServers(episodeInfo);
 
-        const availableServers = Object.keys(serversMap).sort();
-        const index = server === "default" ? 0 : parseInt(server.replace(/\D/g, ""), 10) - 1;
-        const selectedServer = availableServers[index];
-
-        const videoSources: VideoSource[] = [];
-        let headers: { [key: string]: string } = {};
-
-        if (selectedServer) {
-            const results = await Promise.all(
-                serversMap[selectedServer]
-                    .filter((entry) => entry.url)
-                    .map((entry) => extract(selectedServer, entry.url, entry.version.toUpperCase())),
-            );
-
-            for (const result of results) {
-                videoSources.push(...result.sources);
-                if (result.headers) headers = { ...headers, ...result.headers };
-            }
-        }
-
-        return { server: selectedServer ?? server, headers, videoSources };
+        return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.version.toUpperCase()));
     }
 
-    private async getTvServers(episodeInfo: any): Promise<Record<string, { url: string; version: string }[]>> {
+    private async getTvServers(episodeInfo: EpisodeId & { type: "tv" }): Promise<Record<string, ServerEntry[]>> {
         const json = (await this.fetchJson(`${baseUrl}/ep-data.php?id=${episodeInfo.id}`)) ?? {};
-        const map: Record<string, { url: string; version: string }[]> = {};
+        const map: Record<string, ServerEntry[]> = {};
 
         for (const version of Object.keys(json)) {
             const servers = json[version]?.[episodeInfo.num] ?? {};
 
             for (const [name, url] of Object.entries(servers)) {
-                if (name === "premium") continue;
+                if (name === "premium" || !url) continue;
                 (map[name] ??= []).push({ url: url as string, version });
             }
         }
@@ -103,10 +98,10 @@ export class Provider {
         return map;
     }
 
-    private async getMovieServers(episodeInfo: any): Promise<Record<string, { url: string; version: string }[]>> {
+    private async getMovieServers(episodeInfo: EpisodeId): Promise<Record<string, ServerEntry[]>> {
         const json = (await this.fetchJson(`${baseUrl}/engine/ajax/film_api.php?id=${episodeInfo.id}`)) ?? {};
         const players = json.players ?? {};
-        const map: Record<string, { url: string; version: string }[]> = {};
+        const map: Record<string, ServerEntry[]> = {};
 
         for (const [name, versions] of Object.entries(players)) {
             if (name === "premium") continue;
