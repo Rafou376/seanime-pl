@@ -1,4 +1,4 @@
-import { absUrl, chapterOrderValue, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix } from "../../utils/html";
+import { absUrl, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix, sortChapters } from "../../utils/html";
 
 type SearchResponse = {
     success: boolean;
@@ -127,9 +127,7 @@ export abstract class Origines {
             });
         }
 
-        return chapters
-            .sort((a, b) => chapterOrderValue(a.chapter) - chapterOrderValue(b.chapter))
-            .map((chapter, index) => ({ ...chapter, index }));
+        return sortChapters(chapters);
     }
 
     private parsePages(chapterHtml: string): ChapterPage[] {

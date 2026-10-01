@@ -1,4 +1,4 @@
-import { chapterOrderValue } from "../../utils/html";
+import { sortChapters } from "../../utils/html";
 
 type MangaShort = {
     name: string;
@@ -83,10 +83,9 @@ export abstract class LibGroup {
 
         const chapters = json.data
             .flatMap((chapter) => (chapter.branches.length > 0 ? chapter.branches : [null]).map((branch) => this.toChapterDetails(id, chapter, branch)))
-            .filter((chapter): chapter is Omit<ChapterDetails, "index"> => chapter !== null)
-            .sort((a, b) => chapterOrderValue(a.chapter) - chapterOrderValue(b.chapter));
+            .filter((chapter): chapter is Omit<ChapterDetails, "index"> => chapter !== null);
 
-        return chapters.map((chapter, index) => ({ ...chapter, index }));
+        return sortChapters(chapters);
     }
 
     async findChapterPages(id: string): Promise<ChapterPage[]> {

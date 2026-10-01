@@ -1,4 +1,4 @@
-import { absUrl, chapterOrderValue, getAttrByClass, getLinkHrefByClass, getTextByClass, scriptContaining, stripTags } from "../../utils/html";
+import { absUrl, getAttrByClass, getLinkHrefByClass, getTextByClass, scriptContaining, sortChapters, stripTags } from "../../utils/html";
 
 type SearchResponse = {
     total: number;
@@ -88,9 +88,7 @@ export abstract class GroupLe {
             });
         }
 
-        return chapters
-            .sort((a, b) => chapterOrderValue(a.chapter) - chapterOrderValue(b.chapter))
-            .map((chapter, index) => ({ ...chapter, index }));
+        return sortChapters(chapters);
     }
 
     async findChapterPages(id: string): Promise<ChapterPage[]> {
