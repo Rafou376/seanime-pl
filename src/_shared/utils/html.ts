@@ -1,6 +1,14 @@
 const ANY_TAG = "[a-zA-Z][a-zA-Z0-9]*";
 const ATTR_VALUE = `["']([^"']*)["']`;
 
+const ORIGIN_RE = /^[a-z][a-z\d+.-]*:\/\/[^/]+/i;
+const ANCHOR_RE = /<a\b[^>]*?\shref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a\s*>/gi;
+const STYLE_URL_RE = /url\(\s*["']?([^"')]+?)["']?\s*\)/i;
+const OPEN_TAG_RE = /^<[^>]+>/;
+const ATTR_RES = new Map<string, RegExp>();
+
+export type Anchor = { href: string; content: string };
+
 const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
 
 function escapeRegExp(value: string): string {
@@ -157,12 +165,32 @@ export function getBlocksByClass(html: string, className: string, tag: string = 
     return blocks;
 }
 
-export function getImageUrl(html: string, tag: string = "img"): string | null {
-    const match =
-        html.match(new RegExp(`<${tag}\\b[^>]*\\bdata-src=["']([^"']+)["']`, "i")) ??
-        html.match(new RegExp(`<${tag}\\b[^>]*\\bsrc=["']([^"']+)["']`, "i"));
+export function getFirstLink(html: string, tag: string = "a"): { href: string; text: string } | null {
+    const match = new RegExp(`<(${tag})\\b[^>]*\\bhref=${ATTR_VALUE}[^>]*>`, "i").exec(html);
+    if (!match) return null;
 
-    return match?.[1] ?? null;
+    return { href: match[2], text: extractElementText(html, match) ?? "" };
+}
+
+export function getImageSource(tag: string, attrs: string[]): string | null {
+    for (const name of attrs) {
+        const value = getTagAttr(tag, name);
+        if (!value) continue;
+
+        const url = name === "style" ? STYLE_URL_RE.exec(value)?.[1] : name === "data-srcset" ? value.trim().split(/[\s,]+/)[0] : value;
+        if (url) return url;
+    }
+
+    return null;
+}
+
+export function getImageUrl(html: string, tag: string = "img"): string | null {
+    for (const match of html.matchAll(new RegExp(`<${tag}\\b[^>]*>`, "gi"))) {
+        const url = getImageSource(match[0], ["data-src", "src"]);
+        if (url) return url;
+    }
+
+    return null;
 }
 
 export function stripTags(html: string): string {
@@ -182,9 +210,35 @@ export function absUrl(path: string, baseUrl: string): string {
     }
 }
 
+export function relativePath(url: string): string {
+    return url.replace(ORIGIN_RE, "").split("#")[0].replace(/^\/+/, "");
+}
+
+export function getTagAttr(tag: string, name: string): string | null {
+    let re = ATTR_RES.get(name);
+
+    if (!re) {
+        re = new RegExp(`\\s${escapeRegExp(name)}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "i");
+        ATTR_RES.set(name, re);
+    }
+
+    const match = re.exec(OPEN_TAG_RE.exec(tag)?.[0] ?? tag);
+    return match ? (match[1] ?? match[2]) : null;
+}
+
+export function getAnchors(html: string): Anchor[] {
+    return [...html.matchAll(ANCHOR_RE)].map((match) => ({ href: match[1] ?? match[2], content: match[3] }));
+}
+
 export function chapterOrderValue(chapter: string): number {
     const value = parseFloat(chapter);
     return Number.isNaN(value) ? Number.POSITIVE_INFINITY : value;
+}
+
+export function sortChapters<T extends { chapter: string }>(chapters: T[]): (T & { index: number })[] {
+    return chapters
+        .sort((a, b) => chapterOrderValue(a.chapter) - chapterOrderValue(b.chapter))
+        .map((chapter, index) => ({ ...chapter, index }));
 }
 
 export function scriptContaining(html: string, needle: string): string | null {
