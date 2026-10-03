@@ -22,3 +22,34 @@ export function parseSetCookie(res: { headers: { get(name: string): string | nul
 
     return cookies;
 }
+
+export function parseJson<T>(text: string): T | null {
+    try {
+        return JSON.parse(text) as T;
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchText(url: string, init?: RequestInit): Promise<string | null> {
+    try {
+        const res = init ? await fetch(url, init) : await fetch(url);
+        return res.ok ? await res.text() : null;
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | null> {
+    const text = await fetchText(url, init);
+
+    return text === null ? null : parseJson<T>(text);
+}
+
+export function fetchForm(url: string, fields: Record<string, string>, headers: Record<string, string> = {}): Promise<string | null> {
+    return fetchText(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
+        body: new URLSearchParams(fields).toString(),
+    });
+}
