@@ -111,7 +111,7 @@ jobs:
 
       - name: Commit updated manifests
         if: github.event_name == 'push' && steps.diff.outputs.changed == 'true'
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: rebuild manifest.json for updated extensions"
           file_pattern: ${{ steps.concerned.outputs.manifests }}
