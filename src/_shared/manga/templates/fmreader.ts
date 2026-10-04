@@ -1,3 +1,4 @@
+import { utcIso } from "../../utils/dates";
 import { absUrl, Anchor, getAnchors, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, sortChapters, stripTags } from "../../utils/html";
 import { cookieHeader, parseSetCookie } from "../../utils/http";
 
@@ -11,7 +12,7 @@ type Page = {
     cookies: Record<string, string>;
 };
 
-const IMG_ATTRS = ["data-original", "data-src", "data-bg", "data-srcset", "style", "src"];
+const IMG_ATTRS = ["data-original", "data-src", "data-lazy-src", "data-bg", "data-srcset", "data-lazy-srcset", "style", "src", "srcset"];
 
 const IMG_TAG_RE = /<img\b[^>]*>/gi;
 const ABSOLUTE_DATE_RE = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
@@ -20,13 +21,21 @@ const TRAILING_NUMBER_RE = /(\d+(?:\.\d+)?)(?=\D*$)/;
 
 const CHAPTER_NUMBER_RES = [/(?:\b(?:ch(?:apter)?|chap)\.?|第|#)\s*(\d+(?:\.\d+)?)/i, /(\d+(?:\.\d+)?)\s*[話话章]/, /(\d+(?:\.\d+)?)/];
 
+function subtractMonths(date: Date, months: number): void {
+    const day = date.getDate();
+
+    date.setDate(1);
+    date.setMonth(date.getMonth() - months);
+    date.setDate(Math.min(day, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()));
+}
+
 const RELATIVE_UNITS: RelativeUnit[] = [
     { words: ["min", "phút", "minuto", "dakika"], subtract: (date, value) => date.setMinutes(date.getMinutes() - value) },
     { words: ["hour", "giờ", "hora", "saat"], subtract: (date, value) => date.setHours(date.getHours() - value) },
     { words: ["day", "ngày", "día", "gün"], subtract: (date, value) => date.setDate(date.getDate() - value) },
     { words: ["week", "tuần", "semana", "hafta"], subtract: (date, value) => date.setDate(date.getDate() - value * 7) },
-    { words: ["month", "tháng", "mes", "ay"], subtract: (date, value) => date.setMonth(date.getMonth() - value) },
-    { words: ["year", "năm", "año", "yıl"], subtract: (date, value) => date.setFullYear(date.getFullYear() - value) },
+    { words: ["month", "tháng", "mes", "ay"], subtract: (date, value) => subtractMonths(date, value) },
+    { words: ["year", "năm", "año", "yıl"], subtract: (date, value) => subtractMonths(date, value * 12) },
 ];
 
 function matchesUnit(words: string[], word: string): boolean {
@@ -119,9 +128,7 @@ export abstract class FMReader {
         if (!match) return undefined;
 
         const [, day, month, year] = match;
-        const date = new Date(Date.UTC(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10)));
-
-        return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+        return utcIso(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
     }
 
     private absolute(path: string): string {
