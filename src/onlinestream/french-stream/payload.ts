@@ -1,60 +1,76 @@
 /// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
-import { extract } from "../../_shared/onlinestream/extractors";
+import { extract, extractorNames } from "../../_shared/onlinestream/extractors";
 import { episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
+import { decodeEntities } from "../../_shared/utils/html";
+import { fetchForm, parseJson } from "../../_shared/utils/http";
 
 const baseUrl = "https://french-stream.net";
 
-type EpisodeId = {
-    id: string;
-    type: "movie"
-} | {
+const SEARCH_RE = /location\.href='\/(\d+)-([^']+?)\.html'[\s\S]*?<div class='search-title'>([^<]+)<\/div>/g;
+
+type TvEpisodeId = {
     id: string;
     type: "tv";
-    num: string
+    num: string;
 };
+
+type EpisodeId = {
+    id: string;
+    type: "movie";
+} | TvEpisodeId;
 
 type ServerEntry = {
     url: string;
-    version: string
+    version: string;
 };
 
-export class Provider {
-    private static readonly MAX_SERVERS = 10;
+type ServersMap = Record<string, ServerEntry[]>;
 
+type EpisodesData = Record<string, Record<string, Record<string, string | null>>>;
+
+type FilmData = {
+    players?: Record<string, Record<string, string>>;
+};
+
+async function fetchData<T>(url: string): Promise<T | null> {
+    try {
+        return parseJson<T>(await (await fetch(url)).text());
+    } catch {
+        return null;
+    }
+}
+
+export class Provider {
     getSettings(): Settings {
         return {
-            episodeServers: episodeServerList(Provider.MAX_SERVERS),
+            episodeServers: episodeServerList(extractorNames()),
             supportsDub: true,
         };
     }
 
     async search(opts: SearchOptions): Promise<SearchResult[]> {
-        const formData = new URLSearchParams();
+        const html = await fetchForm(`${baseUrl}/engine/ajax/search.php`, { query: opts.query, page: "1" });
+        if (!html) return [];
 
-        formData.append("query", opts.query);
-        formData.append("page", "1");
-
-        const res = await fetch(`${baseUrl}/engine/ajax/search.php`, {
-            method: "POST",
-            body: formData,
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        });
-
-        const html = await res.text();
-        const regex = /location\.href='\/(\d+)-([^']+?)\.html'[\s\S]*?<div class='search-title'>([^<]+)<\/div>/g;
-
-        return Array.from(html.matchAll(regex)).map(([, id, slug, title]) => ({
+        return [...html.matchAll(SEARCH_RE)].map(([, id, slug, title]) => ({
             id,
-            title: title.trim(),
+            title: decodeEntities(title.trim()),
             url: `${baseUrl}/${id}-${slug}.html`,
-            subOrDub: "both" as SubOrDub,
+            subOrDub: "both" as const,
         }));
     }
 
     async findEpisodes(id: string): Promise<EpisodeDetails[]> {
-        const json = await this.fetchJson(`${baseUrl}/ep-data.php?id=${id}`);
+        const dataUrl = `${baseUrl}/ep-data.php?id=${id}`;
+        let json: EpisodesData | null;
 
-        const episodeNumbers = new Set<string>([
+        try {
+            json = parseJson<EpisodesData>(await (await fetch(dataUrl)).text());
+        } catch {
+            return [];
+        }
+
+        const episodeNumbers = new Set([
             ...Object.keys(json?.vf ?? {}),
             ...Object.keys(json?.vostfr ?? {}),
             ...Object.keys(json?.vo ?? {}),
@@ -65,12 +81,14 @@ export class Provider {
             return [{ id: episodeId, number: 1, url: episodeId, title: "Film" }];
         }
 
-        return Array.from(episodeNumbers)
-            .map((num) => {
+        return [...episodeNumbers]
+            .map((num) => ({ num, number: parseInt(num, 10) }))
+            .filter(({ number }) => Number.isFinite(number))
+            .sort((a, b) => a.number - b.number)
+            .map(({ num, number }) => {
                 const episodeId = JSON.stringify({ id, type: "tv", num });
-                return { id: episodeId, number: parseInt(num, 10), url: episodeId, title: `Episode ${num}` };
-            })
-            .sort((a, b) => a.number - b.number);
+                return { id: episodeId, number, url: episodeId, title: `Episode ${num}` };
+            });
     }
 
     async findEpisodeServer(episode: EpisodeDetails, server: string): Promise<EpisodeServer> {
@@ -82,49 +100,39 @@ export class Provider {
         return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.version.toUpperCase()));
     }
 
-    private async getTvServers(episodeInfo: EpisodeId & { type: "tv" }): Promise<Record<string, ServerEntry[]>> {
-        const json = (await this.fetchJson(`${baseUrl}/ep-data.php?id=${episodeInfo.id}`)) ?? {};
-        const map: Record<string, ServerEntry[]> = {};
+    private async getTvServers(episodeInfo: TvEpisodeId): Promise<ServersMap> {
+        const json = (await fetchData<EpisodesData>(`${baseUrl}/ep-data.php?id=${episodeInfo.id}`)) ?? {};
+        const map: ServersMap = {};
 
-        for (const version of Object.keys(json)) {
-            const servers = json[version]?.[episodeInfo.num] ?? {};
+        for (const [version, episodes] of Object.entries(json)) {
+            const servers = episodes?.[episodeInfo.num] ?? {};
 
             for (const [name, url] of Object.entries(servers)) {
                 if (name === "premium" || !url) continue;
-                (map[name] ??= []).push({ url: url as string, version });
+                (map[name] ??= []).push({ url, version });
             }
         }
 
         return map;
     }
 
-    private async getMovieServers(episodeInfo: EpisodeId): Promise<Record<string, ServerEntry[]>> {
-        const json = (await this.fetchJson(`${baseUrl}/engine/ajax/film_api.php?id=${episodeInfo.id}`)) ?? {};
-        const players = json.players ?? {};
-        const map: Record<string, ServerEntry[]> = {};
+    private async getMovieServers(episodeInfo: EpisodeId): Promise<ServersMap> {
+        const json = await fetchData<FilmData>(`${baseUrl}/engine/ajax/film_api.php?id=${episodeInfo.id}`);
+        const map: ServersMap = {};
 
-        for (const [name, versions] of Object.entries(players)) {
+        for (const [name, versions] of Object.entries(json?.players ?? {})) {
             if (name === "premium") continue;
 
-            const versionMap = versions as Record<string, string>;
+            const entries = Object.entries(versions);
 
-            for (const [version, url] of Object.entries(versionMap)) {
+            for (const [version, url] of entries) {
                 if (!url) continue;
-                if (version === "default" && Object.entries(versionMap).some(([v, u]) => v !== "default" && u === url)) continue;
+                if (version === "default" && entries.some(([other, otherUrl]) => other !== "default" && otherUrl === url)) continue;
 
                 (map[name] ??= []).push({ url, version: version === "default" ? "VO" : version });
             }
         }
 
         return map;
-    }
-
-    private async fetchJson(url: string): Promise<any | null> {
-        try {
-            const res = await fetch(url);
-            return JSON.parse(await res.text());
-        } catch {
-            return null;
-        }
     }
 }
