@@ -18,6 +18,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,35 +32,44 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Resolve base ref
         id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin "${{ github.base_ref }}"
-            echo "ref=$(git merge-base "origin/${{ github.base_ref }}" HEAD)" >> "$GITHUB_OUTPUT"
-          elif git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
-            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch origin "$BASE_REF"
+            echo "ref=$(git merge-base "origin/$BASE_REF" HEAD)" >> "$GITHUB_OUTPUT"
+          elif git cat-file -e "$BEFORE_SHA" 2>/dev/null; then
+            echo "ref=$BEFORE_SHA" >> "$GITHUB_OUTPUT"
           else
             echo "ref=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Bump extension versions for changed extractors
         if: steps.base.outputs.ref != ''
-        run: npx tsx scripts/bump-extension-versions.ts "${{ steps.base.outputs.ref }}"
+        env:
+          BASE: ${{ steps.base.outputs.ref }}
+        run: npx tsx scripts/bump-extension-versions.ts "$BASE"
 
       - name: Determine concerned extensions
         id: concerned
+        env:
+          BASE: ${{ steps.base.outputs.ref }}
         run: |
-          if [ -n "${{ steps.base.outputs.ref }}" ]; then
-            DIRS=$(npx tsx scripts/concerned-extensions.ts "${{ steps.base.outputs.ref }}" HEAD)
+          if [ -n "$BASE" ]; then
+            DIRS=$(npx tsx scripts/concerned-extensions.ts "$BASE" HEAD)
           else
             DIRS=$(npx tsx scripts/concerned-extensions.ts)
           fi
@@ -69,8 +82,14 @@ jobs:
           echo "manifests=$MANIFESTS" >> "$GITHUB_OUTPUT"
 
       - name: Build concerned extensions
+        env:
+          DIRS: ${{ steps.concerned.outputs.dirs }}
         run: |
-          DIRS="${{ steps.concerned.outputs.dirs }}"
+          if [ -z "$(echo "$DIRS" | tr -d '[:space:]')" ]; then
+            echo "No concerned extensions"
+            exit 0
+          fi
+
           npx tsx bundle.ts $DIRS
 
       - name: Check manifest payloads
@@ -79,8 +98,10 @@ jobs:
       - name: Check for manifest changes on concerned extensions
         if: github.event_name == 'push'
         id: diff
+        env:
+          MANIFESTS: ${{ steps.concerned.outputs.manifests }}
         run: |
-          if [ -n "${{ steps.concerned.outputs.manifests }}" ] && ! git diff --quiet -- ${{ steps.concerned.outputs.manifests }}; then
+          if [ -n "$MANIFESTS" ] && ! git diff --quiet -- $MANIFESTS; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
