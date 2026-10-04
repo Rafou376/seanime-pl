@@ -1,18 +1,10 @@
-import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { join, basename } from "path";
 import { DOMAINS, Domain, declaredIds, findExtensionDirs } from "./domains";
+import { changedFiles as gitChangedFiles } from "./git";
 
-const diffSpec = process.argv.slice(2).join(" ");
-
-let changedFiles: string[] = [];
-if (diffSpec) {
-    try {
-        changedFiles = execSync(`git diff --name-only ${diffSpec}`, { encoding: "utf-8" }).split("\n").filter(Boolean);
-    } catch {
-        changedFiles = [];
-    }
-}
+const diffRefs = process.argv.slice(2).filter(Boolean);
+const changedFiles = diffRefs.length > 0 ? gitChangedFiles(...diffRefs) : [];
 
 function printAndExit(dirs: string[]) {
     console.log(Array.from(new Set(dirs)).sort().join("\n"));

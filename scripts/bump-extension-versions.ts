@@ -1,17 +1,9 @@
 import { readFileSync, writeFileSync } from "fs";
-import { execSync } from "child_process";
 import { join } from "path";
 import { DOMAINS, declaredIds, findExtensionDirs } from "./domains";
+import { showAt } from "./git";
 
 const base = process.argv[2];
-
-function showAt(ref: string, path: string): string | null {
-    try {
-        return execSync(`git show ${ref}:${path}`, { encoding: "utf-8" });
-    } catch {
-        return null;
-    }
-}
 
 function bumpPatch(version: string): string {
     const parts = version.split(".");
