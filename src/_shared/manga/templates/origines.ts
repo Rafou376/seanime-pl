@@ -1,4 +1,6 @@
+import { utcIso } from "../../utils/dates";
 import { absUrl, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix, sortChapters } from "../../utils/html";
+import { fetchForm, fetchText, parseJson } from "../../utils/http";
 
 type SearchResponse = {
     success: boolean;
@@ -13,37 +15,23 @@ type SearchResultItem = {
 
 const CHAPTER_DATE_RE = /(\d{1,2})\s+(\p{L}+)\.?(?:\s+(\d{4}))?/u;
 
-const MONTHS = [
-    ["jan"],
-    ["fev", "fév"],
-    ["mar"],
-    ["avr"],
-    ["mai"],
-    ["juin"],
-    ["juil"],
-    ["ao"],
-    ["sep"],
-    ["oct"],
-    ["nov"],
-    ["dec", "déc"],
-];
+const MONTHS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "ao", "sep", "oct", "nov", "dec"];
 
 export abstract class Origines {
     protected abstract readonly baseUrl: string;
     protected abstract readonly mangaPath: string;
     protected readonly legacyMangaPaths: string[] = [];
 
+    private knownPathsCache: Set<string> | null = null;
+
     getSettings(): Settings {
         return {};
     }
 
     async search(opts: QueryOptions): Promise<SearchResult[]> {
-        const body = `action=madara_child_search&term=${encodeURIComponent(opts.query)}`;
-        const res = await this.postForm(`${this.baseUrl}/wp-admin/admin-ajax.php`, body);
-        if (!res) return [];
-
-        const json = JSON.parse(await res.text()) as SearchResponse;
-        const items = Array.isArray(json.data) ? json.data : [];
+        const text = await fetchForm(`${this.baseUrl}/wp-admin/admin-ajax.php`, { action: "madara_child_search", term: opts.query });
+        const data = text ? parseJson<SearchResponse>(text)?.data : undefined;
+        const items = Array.isArray(data) ? data : [];
 
         return items
             .filter((item) => item.title && item.url)
@@ -55,30 +43,19 @@ export abstract class Origines {
     }
 
     async findChapters(id: string): Promise<ChapterDetails[]> {
-        const res = await fetch(`${this.baseUrl}/${this.mangaPath}/${id}/`);
-        if (!res.ok) return [];
+        const html = await fetchText(`${this.baseUrl}/${this.mangaPath}/${id}/`);
 
-        return this.parseChapters(await res.text(), id);
+        return html ? this.parseChapters(html, id) : [];
     }
 
     async findChapterPages(id: string): Promise<ChapterPage[]> {
-        const res = await fetch(`${this.baseUrl}/${this.mangaPath}/${id}/?style=list`);
-        if (!res.ok) return [];
+        const html = await fetchText(`${this.baseUrl}/${this.mangaPath}/${id}/?style=list`);
 
-        return this.parsePages(await res.text());
-    }
-
-    private async postForm(url: string, body: string): Promise<Response | null> {
-        const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body,
-        });
-        return res.ok ? res : null;
+        return html ? this.parsePages(html) : [];
     }
 
     private get knownPaths(): Set<string> {
-        return new Set([...this.legacyMangaPaths, this.mangaPath]);
+        return (this.knownPathsCache ??= new Set([...this.legacyMangaPaths, this.mangaPath]));
     }
 
     private splitSegments(path: string): string[] {
@@ -157,20 +134,18 @@ export abstract class Origines {
         const month = this.monthNumber(monthLabel);
         if (month === undefined) return undefined;
 
+        const dayNumber = parseInt(day, 10);
         const now = new Date();
-        const resolvedYear = year ? parseInt(year, 10) : now.getFullYear();
-        let result = new Date(Date.UTC(resolvedYear, month, parseInt(day, 10)));
+        let resolvedYear = year ? parseInt(year, 10) : now.getFullYear();
 
-        if (!year && result.getTime() > now.getTime()) {
-            result = new Date(Date.UTC(resolvedYear - 1, month, parseInt(day, 10)));
-        }
+        if (!year && Date.UTC(resolvedYear, month, dayNumber) > now.getTime()) resolvedYear -= 1;
 
-        return result.toISOString();
+        return utcIso(resolvedYear, month, dayNumber);
     }
 
     private monthNumber(month: string): number | undefined {
-        const name = month.toLowerCase();
-        const index = MONTHS.findIndex((prefixes) => prefixes.some((prefix) => name.startsWith(prefix)));
+        const name = month.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+        const index = MONTHS.findIndex((prefix) => name.startsWith(prefix));
 
         return index === -1 ? undefined : index;
     }
