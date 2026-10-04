@@ -1,12 +1,17 @@
 {
     "name": "seanime-pl",
     "private": true,
+    "engines": {
+        "node": ">=20"
+    },
     "scripts": {
         "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.manga.json",
-        "build": "npx tsx bundle.ts"
+        "build": "tsx bundle.ts",
+        "check": "tsx scripts/check-payloads.ts",
+        "bump": "tsx scripts/bump-extension-versions.ts"
     },
     "devDependencies": {
-        "@types/node": "^20.14.0",
+        "@types/node": "^22.0.0",
         "esbuild": "^0.23.0",
         "tsx": "^4.16.0",
         "typescript": "^5.5.0"
