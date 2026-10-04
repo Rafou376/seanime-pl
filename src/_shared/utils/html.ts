@@ -255,8 +255,12 @@ export function absUrl(path: string, baseUrl: string): string {
     }
 }
 
+export function trimLeadingSlashes(value: string): string {
+    return value.replace(/^\/+/, "");
+}
+
 export function relativePath(url: string): string {
-    return url.replace(ORIGIN_RE, "").split("#")[0].replace(/^\/+/, "");
+    return trimLeadingSlashes(url.replace(ORIGIN_RE, "").split("#")[0]);
 }
 
 export function getTagAttr(tag: string, name: string): string | null {

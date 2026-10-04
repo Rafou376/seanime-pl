@@ -1,4 +1,6 @@
-import { absUrl, getAttrByClass, getLinkHrefByClass, getTextByClass, scriptContaining, sortChapters, stripTags } from "../../utils/html";
+import { utcIso } from "../../utils/dates";
+import { absUrl, getAttrByClass, getLinkHrefByClass, getTextByClass, scriptContaining, sortChapters, stripTags, trimLeadingSlashes } from "../../utils/html";
+import { fetchJson, fetchText } from "../../utils/http";
 
 type SearchResponse = {
     total: number;
@@ -29,8 +31,6 @@ export abstract class GroupLe {
 
     private userHash: string | null = null;
     private userHashRequest: Promise<string | null> | null = null;
-    private cachedHtmlHeaders: Record<string, string> | null = null;
-    private cachedApiHeaders: Record<string, string> | null = null;
 
     getSettings(): Settings {
         return { supportsMultiScanlator: true };
@@ -44,7 +44,7 @@ export abstract class GroupLe {
 
         if (opts.query) url.searchParams.set("q", opts.query);
 
-        const json = await this.fetchJson<SearchResponse>(url.toString());
+        const json = await fetchJson<SearchResponse>(url.toString(), { headers: this.apiHeaders() });
         if (!json) return [];
 
         return json.list.map((item) => ({
@@ -55,7 +55,7 @@ export abstract class GroupLe {
     }
 
     async findChapters(id: string): Promise<ChapterDetails[]> {
-        const html = await this.fetchHtml(`${this.baseUrl}/${id.replace(/^\/+/, "")}`);
+        const html = await this.fetchHtml(`${this.baseUrl}/${trimLeadingSlashes(id)}`);
         if (!html || html.includes("Запрещена публикация произведения по копирайту")) return [];
 
         const title = getTextByClass(html, "cr-hero-names__main") ?? "";
@@ -70,7 +70,7 @@ export abstract class GroupLe {
             const rawNumber = getAttrByClass(row, "item-title", "data-num", "td");
             const chapterNumber = String(rawNumber ? parseFloat(rawNumber) / 10 : 0);
 
-            const scanlator = this.scanlatorFromTitle(getAttrByClass(row, "chapter-link", "title", "a") ?? "");
+            const scanlator = this.scanlatorFromTitle(getAttrByClass(row, "chapter-link", "title", "a"));
             const name = this.cleanChapterName(stripTags(getTextByClass(row, "chapter-link", "a") ?? href), title, chapterNumber);
 
             const dateCells = [...row.matchAll(DATE_CELL_RE)].map((match) => stripTags(match[1]));
@@ -83,7 +83,7 @@ export abstract class GroupLe {
                 url: absUrl(chapterId, this.baseUrl),
                 title: name || `Глава ${chapterNumber}`,
                 chapter: chapterNumber,
-                scanlator: scanlator || undefined,
+                scanlator,
                 updatedAt: this.parseChapterDate(dateText),
             });
         }
@@ -114,10 +114,7 @@ export abstract class GroupLe {
     private parsePages(source: string, referer: string): ChapterPage[] {
         const pages: ChapterPage[] = [];
 
-        let match: RegExpExecArray | null;
-        PAGES_RE.lastIndex = 0;
-
-        while ((match = PAGES_RE.exec(source)) !== null) {
+        for (const match of source.matchAll(PAGES_RE)) {
             const [, host, middle, end] = match;
             if (!end) continue;
 
@@ -157,7 +154,7 @@ export abstract class GroupLe {
             }
         }
 
-        const url = new URL(/^https?:\/\//.test(value) ? value : `${this.baseUrl}/${value.replace(/^\/+/, "")}`);
+        const url = new URL(/^https?:\/\//.test(value) ? value : `${this.baseUrl}/${trimLeadingSlashes(value)}`);
         url.searchParams.set("mtr", "true");
 
         if (!url.searchParams.get("d")) {
@@ -177,6 +174,7 @@ export abstract class GroupLe {
 
         this.userHashRequest = this.fetchHtml(`${this.baseUrl}/${slug}`).then((html) => {
             this.userHash = html ? USER_HASH_RE.exec(html)?.[1] ?? null : null;
+            this.userHashRequest = null;
             return this.userHash;
         });
 
@@ -191,54 +189,42 @@ export abstract class GroupLe {
     }
 
     private htmlHeaders(): Record<string, string> {
-        return (this.cachedHtmlHeaders ??= {
+        return {
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "ru,en;q=0.9",
             "User-Agent": USER_AGENT,
             Referer: `${this.baseUrl}/`,
-        });
+        };
     }
 
     private apiHeaders(): Record<string, string> {
-        return (this.cachedApiHeaders ??= {
+        return {
             Accept: "application/json, text/plain, */*",
             "User-Agent": USER_AGENT,
             "Site-Id": String(this.siteId),
-        });
+        };
     }
 
-    private async fetchHtml(url: string): Promise<string | null> {
-        try {
-            const res = await fetch(url, { headers: this.htmlHeaders() });
-            return res.ok ? await res.text() : null;
-        } catch {
-            return null;
-        }
-    }
-
-    private async fetchJson<T>(url: string): Promise<T | null> {
-        try {
-            const res = await fetch(url, { headers: this.apiHeaders() });
-            return res.ok ? ((await res.json()) as T) : null;
-        } catch {
-            return null;
-        }
+    private fetchHtml(url: string): Promise<string | null> {
+        return fetchText(url, { headers: this.htmlHeaders() });
     }
 
     private chapterId(href: string, searchParams: string): string {
-        const path = href.startsWith("http") ? new URL(href).pathname : href;
+        const path = /^https?:/i.test(href) ? new URL(href).pathname : href;
         return `${path}${searchParams}`;
     }
 
-    private scanlatorFromTitle(raw: string): string {
-        if (!raw) return "";
+    private scanlatorFromTitle(raw: string | null): string | undefined {
+        if (!raw) return undefined;
 
-        return raw
-            .replace("(Переводчик),", "&")
-            .replace("Переводчик,", "&")
+        const scanlator = raw
+            .replace(/\(Переводчик\),/g, "&")
+            .replace(/Переводчик,/g, "&")
             .replace(/\s*\(Переводчик\)\s*$/, "")
             .replace(/\s*Переводчик\s*$/, "")
             .trim();
+
+        return scanlator || undefined;
     }
 
     private cleanChapterName(rawName: string, mangaTitle: string, chapterNumber: string): string {
@@ -277,8 +263,6 @@ export abstract class GroupLe {
 
         const [, day, month, rawYear] = match;
         const year = rawYear.length === 2 ? 2000 + parseInt(rawYear, 10) : parseInt(rawYear, 10);
-        const date = new Date(Date.UTC(year, parseInt(month, 10) - 1, parseInt(day, 10)));
-
-        return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+        return utcIso(year, parseInt(month, 10) - 1, parseInt(day, 10));
     }
 }
