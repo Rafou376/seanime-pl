@@ -57,6 +57,7 @@ async function buildExtension(dir: string) {
         target: "es2020",
         platform: "neutral",
         treeShaking: true,
+        charset: "utf8",
         plugins,
     });
 

@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "fs";
-import { join } from "path";
+import { posix } from "path";
 import { DOMAINS, declaredIds, findExtensionDirs } from "./domains";
 import { showAt } from "./git";
 
@@ -33,7 +33,7 @@ for (const domain of DOMAINS) {
     if (bumped.length === 0) continue;
 
     for (const dir of findExtensionDirs(domain.root)) {
-        const manifestPath = join(dir, "manifest.json");
+        const manifestPath = posix.join(dir, "manifest.json");
         const oldManifest = JSON.parse(showAt(base, manifestPath) ?? "null");
         const newManifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
         if (!oldManifest) continue;

@@ -1,5 +1,5 @@
 import { readdirSync, statSync, existsSync } from "fs";
-import { join } from "path";
+import { posix } from "path";
 
 export type Domain = {
     root: string;
@@ -14,7 +14,7 @@ export const DOMAINS: Domain[] = [
     {
         root: "src/onlinestream",
         sharedRoot: "src/_shared/onlinestream",
-        declaration: "./_shared/onlinestream/online-streaming-provider.d.ts",
+        declaration: "./online-streaming-provider.d.ts",
         itemsDir: "src/_shared/onlinestream/extractors",
         registryPath: "src/_shared/onlinestream/registry.json",
         manifestField: "extractors",
@@ -22,7 +22,7 @@ export const DOMAINS: Domain[] = [
     {
         root: "src/manga",
         sharedRoot: "src/_shared/manga",
-        declaration: "./_shared/manga/manga-provider.d.ts",
+        declaration: "./manga-provider.d.ts",
         itemsDir: "src/_shared/manga/templates",
         registryPath: "src/_shared/manga/registry.json",
         manifestField: "template",
@@ -31,14 +31,15 @@ export const DOMAINS: Domain[] = [
 
 export function findExtensionDirs(dir: string): string[] {
     return readdirSync(dir).flatMap((entry) => {
-        const full = join(dir, entry);
+        const full = posix.join(dir, entry);
         if (!statSync(full).isDirectory()) return [];
-        return existsSync(join(full, "payload.ts")) ? [full] : findExtensionDirs(full);
+        return existsSync(posix.join(full, "payload.ts")) ? [full] : findExtensionDirs(full);
     });
 }
 
 export function domainForDir(dir: string): Domain {
-    const domain = DOMAINS.find((d) => dir === d.root || dir.startsWith(`${d.root}/`));
+    const normalized = posix.normalize(dir.replace(/\\/g, "/"));
+    const domain = DOMAINS.find((d) => normalized === d.root || normalized.startsWith(`${d.root}/`));
     if (!domain) throw new Error(`No domain configured for ${dir}`);
     return domain;
 }

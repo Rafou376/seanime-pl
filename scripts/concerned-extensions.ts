@@ -12,7 +12,7 @@ function printAndExit(dirs: string[]) {
 
 const allDirs = DOMAINS.flatMap((domain) => findExtensionDirs(domain.root)).sort();
 
-if (changedFiles.length === 0 || changedFiles.includes("bundle.ts")) {
+if (changedFiles.length === 0 || changedFiles.some((file) => file === "bundle.ts" || file === "scripts/domains.ts")) {
     printAndExit(allDirs);
     process.exit(0);
 }
