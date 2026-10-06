@@ -7,7 +7,7 @@ type SearchResponse = {
     total: number;
     offset: number;
     limit: number;
-    list: SearchResponseItem[];
+    list?: SearchResponseItem[];
 };
 
 type SearchResponseItem = {
@@ -16,7 +16,7 @@ type SearchResponseItem = {
     elementId: { linkName: string };
 };
 
-const USER_HASH_RE = /user_hash.+'(.+)'/;
+const USER_HASH_RE = /user_hash["']?\s*[:=]\s*["']([^"']+)["']/;
 const EXTRA_RE = /\s*([0-9]+\sЭкстра)\s*/;
 const SINGLE_RE = /\s*Сингл\s*/;
 const PAGES_RE = /\[['"](.*?)['"],['"](.*?)['"],['"](.*?)['"].*?]/g;
@@ -46,9 +46,8 @@ export abstract class GroupLe {
         if (opts.query) url.searchParams.set("q", opts.query);
 
         const json = await fetchJson<SearchResponse>(url.toString(), { headers: this.apiHeaders() });
-        if (!json) return [];
 
-        return json.list.map((item) => ({
+        return (json?.list ?? []).map((item) => ({
             id: item.elementId.linkName,
             title: item.name,
             image: item.picUrl ?? undefined,
@@ -68,11 +67,11 @@ export abstract class GroupLe {
             const href = getLinkHrefByClass(row, "chapter-link", "a");
             if (!href) continue;
 
-            const rawNumber = getAttrByClass(row, "item-title", "data-num", "td");
-            const chapterNumber = String(rawNumber ? parseFloat(rawNumber) / 10 : 0);
+            const parsedNumber = parseFloat(getAttrByClass(row, "item-title", "data-num", "td") ?? "");
+            const chapterNumber = String(Number.isFinite(parsedNumber) ? parsedNumber / 10 : 0);
 
             const scanlator = this.scanlatorFromTitle(getAttrByClass(row, "chapter-link", "title", "a"));
-            const name = this.cleanChapterName(stripTags(getTextByClass(row, "chapter-link", "a") ?? href), title, chapterNumber);
+            const name = this.cleanChapterName(getTextByClass(row, "chapter-link", "a") ?? href, title, chapterNumber);
 
             const dateCells = [...row.matchAll(DATE_CELL_RE)].map((match) => stripTags(match[1] ?? ""));
             const dateText = dateCells[dateCells.length - 1] ?? null;
