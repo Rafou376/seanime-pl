@@ -16,14 +16,14 @@ type SearchResultItem = {
 
 const CHAPTER_DATE_RE = /(\d{1,2})\s+(\p{L}+)\.?(?:\s+(\d{4}))?/u;
 
+const ABSOLUTE_URL_RE = /^https?:\/\//i;
+
 const MONTHS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "ao", "sep", "oct", "nov", "dec"];
 
 export abstract class Origines {
     protected abstract readonly baseUrl: string;
     protected abstract readonly mangaPath: string;
     protected readonly legacyMangaPaths: string[] = [];
-
-    private knownPathsCache: Set<string> | null = null;
 
     getSettings(): Settings {
         return {};
@@ -55,22 +55,14 @@ export abstract class Origines {
         return html ? this.parsePages(html) : [];
     }
 
-    private get knownPaths(): Set<string> {
-        return (this.knownPathsCache ??= new Set([...this.legacyMangaPaths, this.mangaPath]));
-    }
-
     private splitSegments(path: string): string[] {
-        return path
-            .split(/[?#]/, 1)[0]!
-            .split("/")
-            .filter((segment) => segment.length > 0);
+        return (path.split(/[?#]/, 1)[0] ?? "").split("/").filter((segment) => segment.length > 0);
     }
 
     private pathSegments(path: string): string[] {
-        const known = this.knownPaths;
-        const cleanPath = path.startsWith("http") ? new URL(path).pathname : path;
+        const cleanPath = ABSOLUTE_URL_RE.test(path) ? new URL(path).pathname : path;
 
-        return this.splitSegments(cleanPath).filter((segment) => !known.has(segment));
+        return this.splitSegments(cleanPath).filter((segment) => segment !== this.mangaPath && !this.legacyMangaPaths.includes(segment));
     }
 
     private toMangaSlug(path: string): string {
