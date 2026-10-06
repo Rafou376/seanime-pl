@@ -63,7 +63,7 @@ jobs:
         if: steps.base.outputs.ref != ''
         env:
           BASE: ${{ steps.base.outputs.ref }}
-        run: npx tsx scripts/bump-extension-versions.ts "$BASE"
+        run: npm run bump -- "$BASE"
 
       - name: Determine concerned extensions
         id: concerned
@@ -76,9 +76,10 @@ jobs:
             DIRS=$(npx tsx scripts/concerned-extensions.ts)
           fi
 
-          echo "dirs<<EOF" >> "$GITHUB_OUTPUT"
+          DELIMITER="dirs_$(openssl rand -hex 8)"
+          echo "dirs<<$DELIMITER" >> "$GITHUB_OUTPUT"
           echo "$DIRS" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "$DELIMITER" >> "$GITHUB_OUTPUT"
 
           MANIFESTS=$(echo "$DIRS" | sed '/^$/d' | awk '{print $0"/manifest.json"}' | tr '\n' ' ')
           echo "manifests=$MANIFESTS" >> "$GITHUB_OUTPUT"
@@ -92,10 +93,10 @@ jobs:
             exit 0
           fi
 
-          npx tsx bundle.ts $DIRS
+          npm run build -- $DIRS
 
       - name: Check manifest payloads
-        run: npx tsx scripts/check-payloads.ts
+        run: npm run check
 
       - name: Check for manifest changes on concerned extensions
         if: github.event_name == 'push'
