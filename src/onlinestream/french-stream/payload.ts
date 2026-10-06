@@ -1,12 +1,17 @@
 /// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
-import { extract, extractorNames } from "../../_shared/onlinestream/extractors";
+import { extract, extractorNames, hasExtractor } from "../../_shared/onlinestream/extractors";
 import { episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
 import { decodeEntities } from "../../_shared/utils/html";
-import { fetchForm, parseJson } from "../../_shared/utils/http";
+import { fetchForm, fetchJson, parseJson } from "../../_shared/utils/http";
 
 const baseUrl = "https://french-stream.net";
 
-const SEARCH_RE = /location\.href='\/(\d+)-([^']+?)\.html'[\s\S]*?<div class='search-title'>([^<]+)<\/div>/g;
+const SEARCH_RE = /location\.href='\/(\d+)-([^']+?)\.html'(?:(?!location\.href=)[\s\S])*?<div class='search-title'>([^<]+)<\/div>/g;
+
+type MovieEpisodeId = {
+    id: string;
+    type: "movie";
+};
 
 type TvEpisodeId = {
     id: string;
@@ -14,10 +19,7 @@ type TvEpisodeId = {
     num: string;
 };
 
-type EpisodeId = {
-    id: string;
-    type: "movie";
-} | TvEpisodeId;
+type EpisodeId = MovieEpisodeId | TvEpisodeId;
 
 type ServerEntry = {
     url: string;
@@ -32,14 +34,6 @@ type FilmData = {
     players?: Record<string, Record<string, string>>;
 };
 
-async function fetchData<T>(url: string): Promise<T | null> {
-    try {
-        return parseJson<T>(await (await fetch(url)).text());
-    } catch {
-        return null;
-    }
-}
-
 export class Provider {
     getSettings(): Settings {
         return {
@@ -52,7 +46,7 @@ export class Provider {
         const html = await fetchForm(`${baseUrl}/engine/ajax/search.php`, { query: opts.query, page: "1" });
         if (!html) return [];
 
-        return [...html.matchAll(SEARCH_RE)].map(([, id, slug, title]) => ({
+        return [...html.matchAll(SEARCH_RE)].map(([, id = "", slug = "", title = ""]) => ({
             id,
             title: decodeEntities(title.trim()),
             url: `${baseUrl}/${id}-${slug}.html`,
@@ -61,19 +55,13 @@ export class Provider {
     }
 
     async findEpisodes(id: string): Promise<EpisodeDetails[]> {
-        const dataUrl = `${baseUrl}/ep-data.php?id=${id}`;
-        let json: EpisodesData | null;
-
-        try {
-            json = parseJson<EpisodesData>(await (await fetch(dataUrl)).text());
-        } catch {
-            return [];
-        }
+        const json = await fetchJson<EpisodesData>(`${baseUrl}/ep-data.php?id=${id}`);
+        if (!json) return [];
 
         const episodeNumbers = new Set([
-            ...Object.keys(json?.vf ?? {}),
-            ...Object.keys(json?.vostfr ?? {}),
-            ...Object.keys(json?.vo ?? {}),
+            ...Object.keys(json.vf ?? {}),
+            ...Object.keys(json.vostfr ?? {}),
+            ...Object.keys(json.vo ?? {}),
         ]);
 
         if (episodeNumbers.size === 0) {
@@ -81,27 +69,34 @@ export class Provider {
             return [{ id: episodeId, number: 1, url: episodeId, title: "Film" }];
         }
 
-        return [...episodeNumbers]
-            .map((num) => ({ num, number: parseInt(num, 10) }))
-            .filter(({ number }) => Number.isFinite(number))
-            .sort((a, b) => a.number - b.number)
-            .map(({ num, number }) => {
+        const episodes = new Map<number, string>();
+
+        for (const num of episodeNumbers) {
+            const number = parseInt(num, 10);
+            if (Number.isFinite(number) && !episodes.has(number)) episodes.set(number, num);
+        }
+
+        return [...episodes]
+            .sort(([a], [b]) => a - b)
+            .map(([number, num]) => {
                 const episodeId = JSON.stringify({ id, type: "tv", num });
                 return { id: episodeId, number, url: episodeId, title: `Episode ${num}` };
             });
     }
 
     async findEpisodeServer(episode: EpisodeDetails, server: string): Promise<EpisodeServer> {
-        const episodeInfo = JSON.parse(episode.id) as EpisodeId;
+        const episodeInfo = parseJson<EpisodeId>(episode.id);
+        if (!episodeInfo) return { server, headers: {}, videoSources: [] };
+
         const serversMap = episodeInfo.type === "tv"
             ? await this.getTvServers(episodeInfo)
             : await this.getMovieServers(episodeInfo);
 
-        return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.version.toUpperCase()));
+        return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.version.toUpperCase()), hasExtractor);
     }
 
     private async getTvServers(episodeInfo: TvEpisodeId): Promise<ServersMap> {
-        const json = (await fetchData<EpisodesData>(`${baseUrl}/ep-data.php?id=${episodeInfo.id}`)) ?? {};
+        const json = (await fetchJson<EpisodesData>(`${baseUrl}/ep-data.php?id=${episodeInfo.id}`)) ?? {};
         const map: ServersMap = {};
 
         for (const [version, episodes] of Object.entries(json)) {
@@ -116,8 +111,8 @@ export class Provider {
         return map;
     }
 
-    private async getMovieServers(episodeInfo: EpisodeId): Promise<ServersMap> {
-        const json = await fetchData<FilmData>(`${baseUrl}/engine/ajax/film_api.php?id=${episodeInfo.id}`);
+    private async getMovieServers(episodeInfo: MovieEpisodeId): Promise<ServersMap> {
+        const json = await fetchJson<FilmData>(`${baseUrl}/engine/ajax/film_api.php?id=${episodeInfo.id}`);
         const map: ServersMap = {};
 
         for (const [name, versions] of Object.entries(json?.players ?? {})) {
