@@ -6,9 +6,8 @@ import { showAt } from "./git";
 const base = process.argv[2];
 
 function bumpPatch(version: string): string {
-    const parts = version.split(".");
-    const patch = Number(parts[2] ?? 0) + 1;
-    return [parts[0], parts[1], patch].join(".");
+    const [major, minor, patch] = version.split(".");
+    return [major, minor, Number(patch ?? 0) + 1].join(".");
 }
 
 if (!base) {
@@ -39,7 +38,7 @@ for (const domain of DOMAINS) {
         const newManifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
         if (!oldManifest) continue;
 
-        const declared = new Set([...(domain.alwaysConcerned ?? []), ...declaredIds(newManifest, domain.manifestField)]);
+        const declared = new Set(declaredIds(newManifest, domain.manifestField));
         const uses = bumped.some((id) => declared.has(id));
         if (!uses || oldManifest.version !== newManifest.version) continue;
 

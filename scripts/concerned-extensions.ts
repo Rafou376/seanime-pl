@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import { join, basename } from "path";
+import { basename, dirname, join } from "path";
 import { DOMAINS, Domain, declaredIds, findExtensionDirs } from "./domains";
 import { changedFiles as gitChangedFiles } from "./git";
 
@@ -26,15 +26,14 @@ function concernedForDomain(domain: Domain): string[] {
         .filter((id) => id !== "types" && id !== "index");
 
     const otherSharedChanged = changedFiles.some((f) => f.startsWith(`${domain.sharedRoot}/`) && !f.startsWith(`${domain.itemsDir}/`));
-    const hasAlwaysConcernedChange = domain.alwaysConcerned?.some((id) => changedItems.includes(id)) ?? false;
-
-    if (otherSharedChanged || hasAlwaysConcernedChange) {
+    
+    if (otherSharedChanged) {
         return dirs;
     }
 
     const directlyChangedDirs = changedFiles
-        .map((f) => f.match(new RegExp(`^(${domain.root}/.+)/(?:payload\\.ts|manifest\\.json)$`))?.[1])
-        .filter((dir): dir is string => Boolean(dir));
+        .filter((f) => f.startsWith(`${domain.root}/`) && ["payload.ts", "manifest.json"].includes(basename(f)))
+        .map((f) => dirname(f));
 
     const dependentDirs = dirs.filter((dir) => {
         if (changedItems.length === 0) return false;

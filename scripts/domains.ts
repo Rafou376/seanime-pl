@@ -8,7 +8,6 @@ export type Domain = {
     itemsDir: string;
     registryPath: string;
     manifestField: string;
-    alwaysConcerned?: string[];
 };
 
 export const DOMAINS: Domain[] = [
@@ -44,8 +43,8 @@ export function domainForDir(dir: string): Domain {
     return domain;
 }
 
-export function declaredIds(manifest: any, field: string): string[] {
+export function declaredIds(manifest: Record<string, unknown>, field: string): string[] {
     const value = manifest[field];
-    if (Array.isArray(value)) return value;
-    return value ? [value] : [];
+    if (Array.isArray(value)) return value.map(String);
+    return value ? [String(value)] : [];
 }
