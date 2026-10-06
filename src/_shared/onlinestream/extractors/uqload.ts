@@ -1,4 +1,5 @@
 import { getInputValue, getLinkHrefByClass } from "../../utils/html";
+import { noSources } from "../provider-helpers";
 import { wait } from "../../utils/timing";
 
 const VIDEO_ID_RE = /(?:embed-|\/d\/)([a-zA-Z0-9_-]+)/;
@@ -70,24 +71,24 @@ async function resolveQuality(qualityUrl: string, resolution: string, label: str
 export async function extractUqload(playerUrl: string, label: string): Promise<ExtractorResult> {
     try {
         const videoId = playerUrl.match(VIDEO_ID_RE)?.[1];
-        if (!videoId) return { sources: [] };
+        if (!videoId) return noSources();
 
         const origin = new URL(playerUrl).origin;
 
         const res1 = await fetch(`${origin}/d/${videoId}`);
-        if (!res1.ok) return { sources: [] };
+        if (!res1.ok) return noSources();
 
         const html1 = await res1.text();
         const qualities = extractQualities(html1);
-        if (!qualities.length) return { sources: [] };
+        if (!qualities.length) return noSources();
 
         const sources = (await Promise.all(qualities.map((q) => resolveQuality(q.url, q.resolution, label))))
             .filter((source): source is VideoSource => source !== null);
 
-        if (!sources.length) return { sources: [] };
+        if (!sources.length) return noSources();
 
         return { sources, headers: { Referer: `${origin}/` } };
     } catch {
-        return { sources: [] };
+        return noSources();
     }
 }
