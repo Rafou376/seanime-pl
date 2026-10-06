@@ -7,25 +7,30 @@ on:
       - "src/onlinestream/**/payload.ts"
       - "src/manga/**/payload.ts"
       - "src/_shared/**"
+      - "scripts/**"
       - "bundle.ts"
+      - "tsconfig*.json"
   pull_request:
     paths:
       - "src/onlinestream/**/payload.ts"
       - "src/manga/**/payload.ts"
       - "src/_shared/**"
+      - "scripts/**"
       - "bundle.ts"
+      - "tsconfig*.json"
       - "package.json"
       - "package-lock.json"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
+  verify:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -37,72 +42,31 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - uses: ./.github/actions/build-extensions
 
-      - name: Typecheck
-        run: npm run typecheck
+  release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - name: Resolve base ref
-        id: base
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
-          BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            git fetch origin "$BASE_REF"
-            echo "ref=$(git merge-base "origin/$BASE_REF" HEAD)" >> "$GITHUB_OUTPUT"
-          elif git cat-file -e "$BEFORE_SHA" 2>/dev/null; then
-            echo "ref=$BEFORE_SHA" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=" >> "$GITHUB_OUTPUT"
-          fi
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
 
-      - name: Bump extension versions for changed extractors
-        if: steps.base.outputs.ref != ''
-        env:
-          BASE: ${{ steps.base.outputs.ref }}
-        run: npm run bump -- "$BASE"
-
-      - name: Determine concerned extensions
-        id: concerned
-        env:
-          BASE: ${{ steps.base.outputs.ref }}
-        run: |
-          if [ -n "$BASE" ]; then
-            DIRS=$(npx tsx scripts/concerned-extensions.ts "$BASE" HEAD)
-          else
-            DIRS=$(npx tsx scripts/concerned-extensions.ts)
-          fi
-
-          DELIMITER="dirs_$(openssl rand -hex 8)"
-          echo "dirs<<$DELIMITER" >> "$GITHUB_OUTPUT"
-          echo "$DIRS" >> "$GITHUB_OUTPUT"
-          echo "$DELIMITER" >> "$GITHUB_OUTPUT"
-
-          MANIFESTS=$(echo "$DIRS" | sed '/^$/d' | awk '{print $0"/manifest.json"}' | tr '\n' ' ')
-          echo "manifests=$MANIFESTS" >> "$GITHUB_OUTPUT"
-
-      - name: Build concerned extensions
-        env:
-          DIRS: ${{ steps.concerned.outputs.dirs }}
-        run: |
-          if [ -z "$(echo "$DIRS" | tr -d '[:space:]')" ]; then
-            echo "No concerned extensions"
-            exit 0
-          fi
-
-          npm run build -- $DIRS
-
-      - name: Check manifest payloads
-        run: npm run check
+      - name: Build extensions
+        id: build
+        uses: ./.github/actions/build-extensions
 
       - name: Check for manifest changes on concerned extensions
-        if: github.event_name == 'push'
         id: diff
         env:
-          MANIFESTS: ${{ steps.concerned.outputs.manifests }}
+          MANIFESTS: ${{ steps.build.outputs.manifests }}
         run: |
           if [ -n "$MANIFESTS" ] && ! git diff --quiet -- $MANIFESTS; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -111,9 +75,9 @@ jobs:
           fi
 
       - name: Commit updated manifests
-        if: github.event_name == 'push' && steps.diff.outputs.changed == 'true'
+        if: steps.diff.outputs.changed == 'true'
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: rebuild manifest.json for updated extensions"
-          file_pattern: ${{ steps.concerned.outputs.manifests }}
+          file_pattern: ${{ steps.build.outputs.manifests }}
           commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>

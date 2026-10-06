@@ -1,0 +1,78 @@
+name: Build extensions
+description: Typecheck, bump, build and verify the extension manifests
+
+outputs:
+  manifests:
+    description: Space-separated manifest paths of the concerned extensions
+    value: ${{ steps.concerned.outputs.manifests }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Typecheck
+      shell: bash
+      run: npm run typecheck
+
+    - name: Resolve base ref
+      id: base
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_REF: ${{ github.base_ref }}
+        BEFORE_SHA: ${{ github.event.before }}
+      run: |
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          git fetch origin "$BASE_REF"
+          echo "ref=$(git merge-base "origin/$BASE_REF" HEAD)" >> "$GITHUB_OUTPUT"
+        elif git cat-file -e "$BEFORE_SHA" 2>/dev/null; then
+          echo "ref=$BEFORE_SHA" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Bump extension versions for changed extractors
+      if: steps.base.outputs.ref != ''
+      shell: bash
+      env:
+        BASE: ${{ steps.base.outputs.ref }}
+      run: npm run bump -- "$BASE"
+
+    - name: Determine concerned extensions
+      id: concerned
+      shell: bash
+      env:
+        BASE: ${{ steps.base.outputs.ref }}
+      run: |
+        if [ -n "$BASE" ]; then
+          DIRS=$(npx tsx scripts/concerned-extensions.ts "$BASE" HEAD)
+        else
+          DIRS=$(npx tsx scripts/concerned-extensions.ts)
+        fi
+
+        DELIMITER="dirs_$(openssl rand -hex 8)"
+        echo "dirs<<$DELIMITER" >> "$GITHUB_OUTPUT"
+        echo "$DIRS" >> "$GITHUB_OUTPUT"
+        echo "$DELIMITER" >> "$GITHUB_OUTPUT"
+
+        MANIFESTS=$(echo "$DIRS" | sed '/^$/d' | awk '{print $0"/manifest.json"}' | tr '\n' ' ')
+        echo "manifests=$MANIFESTS" >> "$GITHUB_OUTPUT"
+
+    - name: Build concerned extensions
+      shell: bash
+      env:
+        DIRS: ${{ steps.concerned.outputs.dirs }}
+      run: |
+        if [ -z "$(echo "$DIRS" | tr -d '[:space:]')" ]; then
+          echo "No concerned extensions"
+          exit 0
+        fi
+
+        npm run build -- $DIRS
+
+    - name: Check manifest payloads
+      shell: bash
+      run: npm run check
