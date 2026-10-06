@@ -17,7 +17,7 @@ export function episodeServerList(names: string[]): string[] {
     return names.map(capitalize);
 }
 
-export function pickServer(availableServers: string[], server: string): string | undefined {
+function pickServer(availableServers: string[], server: string): string | undefined {
     const wanted = server.toLowerCase();
     const byName = availableServers.find((name) => name.toLowerCase().includes(wanted));
     if (byName) return byName;

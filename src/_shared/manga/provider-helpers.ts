@@ -7,18 +7,14 @@ export function matchChapterNumber(source: string, patterns: RegExp[] = [/(\d+(?
     return null;
 }
 
-export function chapterOrderValue(chapter: string): number {
+function chapterOrderValue(chapter: string): number {
     const value = parseFloat(chapter);
     return Number.isNaN(value) ? Number.POSITIVE_INFINITY : value;
 }
 
 export function sortChapters<T extends { chapter: string }>(chapters: T[]): (T & { index: number })[] {
-    return [...chapters]
-        .sort((a, b) => {
-            const left = chapterOrderValue(a.chapter);
-            const right = chapterOrderValue(b.chapter);
-
-            return left === right ? 0 : left - right;
-        })
-        .map((chapter, index) => ({ ...chapter, index }));
+    return chapters
+        .map((chapter) => ({ chapter, order: chapterOrderValue(chapter.chapter) }))
+        .sort((a, b) => (a.order === b.order ? 0 : a.order - b.order))
+        .map(({ chapter }, index) => ({ ...chapter, index }));
 }
