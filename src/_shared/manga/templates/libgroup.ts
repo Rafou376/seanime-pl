@@ -9,7 +9,7 @@ type MangaShort = {
 };
 
 type MangasPage = {
-    data: MangaShort[];
+    data?: MangaShort[];
 };
 
 type ChapterBranch = {
@@ -28,12 +28,12 @@ type Chapter = {
 };
 
 type ChaptersResponse = {
-    data: Chapter[];
+    data?: Chapter[];
 };
 
 type PagesResponse = {
-    data: {
-        pages: { slug: number; url: string }[];
+    data?: {
+        pages?: { slug: number; url: string }[];
     };
 };
 
@@ -44,7 +44,7 @@ type ImageServer = {
 };
 
 type ConstantsResponse = {
-    data: { imageServers: ImageServer[] };
+    data?: { imageServers?: ImageServer[] };
 };
 
 export abstract class LibGroup {
@@ -68,9 +68,8 @@ export abstract class LibGroup {
         if (opts.query) url.searchParams.set("q", opts.query);
 
         const json = await this.fetchApi<MangasPage>(url.toString());
-        if (!json) return [];
 
-        return json.data.map((manga) => ({
+        return (json?.data ?? []).map((manga) => ({
             id: manga.slug_url,
             title: manga.rus_name || manga.name,
             synonyms: manga.rus_name && manga.name !== manga.rus_name ? [manga.name] : undefined,
@@ -80,23 +79,26 @@ export abstract class LibGroup {
 
     async findChapters(id: string): Promise<ChapterDetails[]> {
         const json = await this.fetchApi<ChaptersResponse>(`${this.apiUrl}/api/manga/${id}/chapters`);
-        if (!json || json.data.length === 0) return [];
+        const data = json?.data;
+        if (!data?.length) return [];
 
-        const chapters = json.data
-            .flatMap((chapter) => (chapter.branches.length > 0 ? chapter.branches : [null]).map((branch) => this.toChapterDetails(id, chapter, branch)))
-            .filter((chapter): chapter is Omit<ChapterDetails, "index"> => chapter !== null);
+        const chapters = data.flatMap((chapter) =>
+            (chapter.branches.length > 0 ? chapter.branches : [null]).flatMap((branch) => {
+                const details = this.toChapterDetails(id, chapter, branch);
+
+                return details ? [details] : [];
+            }),
+        );
 
         return sortChapters(chapters);
     }
 
     async findChapterPages(id: string): Promise<ChapterPage[]> {
-        const json = await this.fetchApi<PagesResponse>(`${this.apiUrl}/api/manga/${id}`);
-        if (!json) return [];
+        const [json, server] = await Promise.all([this.fetchApi<PagesResponse>(`${this.apiUrl}/api/manga/${id}`), this.getImgUrl()]);
+        const pages = json?.data?.pages;
+        if (!pages || !server) return [];
 
-        const server = await this.getImgUrl();
-        if (!server) return [];
-
-        return [...json.data.pages]
+        return pages
             .sort((a, b) => a.slug - b.slug)
             .map((page, index) => ({
                 url: `${server}${page.url}`,
@@ -126,15 +128,17 @@ export abstract class LibGroup {
     }
 
     private getImgUrl(): Promise<string | null> {
-        return (this.imgUrlRequest ??= this.loadImgUrl().then((url) => {
-            if (!url) this.imgUrlRequest = null;
-            return url;
-        }));
+        return (this.imgUrlRequest ??= this.loadImgUrl()
+            .catch(() => null)
+            .then((url) => {
+                if (!url) this.imgUrlRequest = null;
+                return url;
+            }));
     }
 
     private async loadImgUrl(): Promise<string | null> {
         const json = await this.fetchApi<ConstantsResponse>(`${this.imgApiUrl}/api/constants?fields[]=imageServers`);
-        const servers = json?.data.imageServers.filter((server) => server.site_ids.includes(this.siteId)) ?? [];
+        const servers = json?.data?.imageServers?.filter((server) => server.site_ids.includes(this.siteId)) ?? [];
         const server = servers.find((candidate) => candidate.id === "compress") ?? servers[0];
 
         return server?.url || null;
