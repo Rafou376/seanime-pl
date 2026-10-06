@@ -1,6 +1,8 @@
 import { EXTRACTORS } from "virtual:extractors-map";
 import { noSources } from "../provider-helpers";
 
+const EXTRACTOR_KEYS = Object.keys(EXTRACTORS).sort((a, b) => b.length - a.length);
+
 export function extractorNames(): string[] {
     return Object.keys(EXTRACTORS);
 }
@@ -10,9 +12,7 @@ function findExtractor(serverName: string): Extractor | undefined {
     const exact = EXTRACTORS[name];
     if (exact) return exact;
 
-    const key = Object.keys(EXTRACTORS)
-        .filter((candidate) => name.includes(candidate))
-        .sort((a, b) => b.length - a.length)[0];
+    const key = EXTRACTOR_KEYS.find((candidate) => name.includes(candidate));
 
     return key === undefined ? undefined : EXTRACTORS[key];
 }
@@ -21,13 +21,17 @@ export function hasExtractor(serverName: string): boolean {
     return findExtractor(serverName) !== undefined;
 }
 
-async function isReachable(url: string, headers: Record<string, string>): Promise<boolean> {
+async function probe(url: string, init: RequestInit): Promise<boolean> {
     try {
-        const res = await fetch(url, { method: "HEAD", headers });
+        const res = await fetch(url, init);
         return res.ok;
     } catch {
         return false;
     }
+}
+
+async function isReachable(url: string, headers: Record<string, string>): Promise<boolean> {
+    return (await probe(url, { method: "HEAD", headers })) || probe(url, { method: "GET", headers: { ...headers, Range: "bytes=0-0" } });
 }
 
 export async function extract(serverName: string, playerUrl: string, label: string): Promise<ExtractorResult> {
