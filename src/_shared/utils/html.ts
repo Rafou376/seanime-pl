@@ -7,6 +7,8 @@ const STYLE_URL_RE = /url\(\s*["']?([^"')]+?)["']?\s*\)/i;
 const OPEN_TAG_RE = /^<[^>]+>/;
 const SCRIPT_STYLE_RE = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>|<!--[\s\S]*?-->/gi;
 const ENTITY_RE = /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi;
+const SRCSET_CANDIDATE_RE = /(\S+?)(?:\s+(\d+(?:\.\d+)?)[wx]\s*(?:,|$)|\s*(?:,\s+|,?$))/g;
+const DATA_URL_RE = /^data:/i;
 const ATTR_RES = new Map<string, RegExp>();
 const REGEX_CACHE = new Map<string, RegExp>();
 
@@ -29,8 +31,31 @@ const ENTITIES = new Map([
     ["eacute", "\u00E9"],
     ["egrave", "\u00E8"],
     ["ecirc", "\u00EA"],
+    ["euml", "\u00EB"],
     ["agrave", "\u00E0"],
+    ["acirc", "\u00E2"],
+    ["icirc", "\u00EE"],
+    ["iuml", "\u00EF"],
+    ["ocirc", "\u00F4"],
+    ["ugrave", "\u00F9"],
+    ["ucirc", "\u00FB"],
+    ["uuml", "\u00FC"],
     ["ccedil", "\u00E7"],
+    ["oelig", "\u0153"],
+    ["Eacute", "\u00C9"],
+    ["Egrave", "\u00C8"],
+    ["Ecirc", "\u00CA"],
+    ["Euml", "\u00CB"],
+    ["Agrave", "\u00C0"],
+    ["Acirc", "\u00C2"],
+    ["Icirc", "\u00CE"],
+    ["Iuml", "\u00CF"],
+    ["Ocirc", "\u00D4"],
+    ["Ugrave", "\u00D9"],
+    ["Ucirc", "\u00DB"],
+    ["Uuml", "\u00DC"],
+    ["Ccedil", "\u00C7"],
+    ["OElig", "\u0152"],
 ]);
 
 export type Anchor = { href: string; content: string };
@@ -45,7 +70,9 @@ function cachedRegex(source: string, flags: string): RegExp {
     const key = `${flags}/${source}`;
     let re = REGEX_CACHE.get(key);
 
-    if (!re) {
+    if (re) {
+        re.lastIndex = 0;
+    } else {
         re = new RegExp(source, flags);
         REGEX_CACHE.set(key, re);
     }
@@ -56,7 +83,7 @@ function cachedRegex(source: string, flags: string): RegExp {
 type MatchMode = "exact" | "word";
 
 function attrValuePattern(escaped: string, quote: string, mode: MatchMode): string {
-    return mode === "exact" ? escaped : `[^${quote}]*\\b${escaped}\\b[^${quote}]*`;
+    return mode === "exact" ? escaped : `(?:[^${quote}]*\\s)?${escaped}(?:\\s[^${quote}]*)?`;
 }
 
 function attrPattern(name: string, value: string, mode: MatchMode): string {
@@ -82,10 +109,7 @@ function hasClassPrefix(openTag: string, prefix: string): boolean {
 }
 
 function findOpenTagByClassPrefix(html: string, prefix: string, tag: string): RegExpExecArray | null {
-    const re = new RegExp(`<(${tag})\\b[^>]*>`, "gi");
-    let match: RegExpExecArray | null;
-
-    while ((match = re.exec(html)) !== null) {
+    for (const match of html.matchAll(cachedRegex(`<(${tag})\\b[^>]*>`, "gi"))) {
         if (hasClassPrefix(match[0], prefix)) return match;
     }
 
@@ -125,7 +149,7 @@ function extractElementText(html: string, match: RegExpExecArray): string | null
     return body === null ? null : stripTags(body) || null;
 }
 
-export function getAttr(
+function getAttr(
     html: string,
     targetAttr: string,
     match: { attr: string; value: string; exact?: boolean },
@@ -161,10 +185,7 @@ export function getTextByClass(html: string, className: string, tag: string = AN
 }
 
 export function getTextByClassPrefix(html: string, prefix: string, tag: string = ANY_TAG): string | null {
-    const re = new RegExp(`<(${tag})\\b[^>]*>`, "gi");
-    let match: RegExpExecArray | null;
-
-    while ((match = re.exec(html)) !== null) {
+    for (const match of html.matchAll(cachedRegex(`<(${tag})\\b[^>]*>`, "gi"))) {
         if (!hasClassPrefix(match[0], prefix)) continue;
 
         const body = elementBody(html, match);
@@ -181,8 +202,6 @@ export function getBlocksByClass(html: string, className: string, tag: string = 
     const re = cachedRegex(openTagPattern(className, tag), "gi");
     const blocks: string[] = [];
     let match: RegExpExecArray | null;
-
-    re.lastIndex = 0;
 
     while ((match = re.exec(html)) !== null) {
         const tagName = match[1] ?? "";
@@ -212,13 +231,27 @@ export function getFirstLink(html: string, tag: string = "a"): { href: string; t
     return { href: decodeEntities(match[2] ?? match[3] ?? ""), text: extractElementText(html, match) ?? "" };
 }
 
+function bestSrcsetUrl(srcset: string): string | null {
+    let best: { url: string; weight: number } | null = null;
+
+    for (const match of srcset.matchAll(SRCSET_CANDIDATE_RE)) {
+        const url = match[1] ?? "";
+        if (!url || DATA_URL_RE.test(url)) continue;
+
+        const weight = match[2] ? parseFloat(match[2]) : 1;
+        if (!best || weight > best.weight) best = { url, weight };
+    }
+
+    return best?.url ?? null;
+}
+
 export function getImageSource(tag: string, attrs: string[]): string | null {
     for (const name of attrs) {
         const value = getTagAttr(tag, name);
         if (!value) continue;
 
-        const url = name === "style" ? STYLE_URL_RE.exec(value)?.[1] : name.endsWith("srcset") ? value.trim().split(/[\s,]+/)[0] : value;
-        if (url) return url;
+        const url = name === "style" ? STYLE_URL_RE.exec(value)?.[1] : name.endsWith("srcset") ? bestSrcsetUrl(value) : value;
+        if (url && !DATA_URL_RE.test(url.trim())) return url;
     }
 
     return null;
@@ -235,7 +268,7 @@ export function getImageUrl(html: string, tag: string = "img"): string | null {
 
 export function decodeEntities(text: string): string {
     return text.replace(ENTITY_RE, (full: string, body: string) => {
-        if (body[0] !== "#") return ENTITIES.get(body.toLowerCase()) ?? full;
+        if (body[0] !== "#") return ENTITIES.get(body) ?? ENTITIES.get(body.toLowerCase()) ?? full;
 
         const code = body[1]?.toLowerCase() === "x" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
 
@@ -269,7 +302,7 @@ export function relativePath(url: string): string {
     return trimLeadingSlashes((url.replace(ORIGIN_RE, "").split("#")[0] ?? ""));
 }
 
-export function getTagAttr(tag: string, name: string): string | null {
+function getTagAttr(tag: string, name: string): string | null {
     let re = ATTR_RES.get(name);
 
     if (!re) {
