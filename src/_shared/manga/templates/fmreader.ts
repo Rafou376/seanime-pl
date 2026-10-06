@@ -1,5 +1,5 @@
 import { utcIso } from "../../utils/dates";
-import { absUrl, Anchor, getAnchors, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
+import { absUrl, type Anchor, getAnchors, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
 import { cookieHeader, parseSetCookie } from "../../utils/http";
 import { matchChapterNumber, sortChapters } from "../provider-helpers";
 
