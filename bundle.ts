@@ -6,6 +6,10 @@ import { DOMAINS, findExtensionDirs, domainForDir } from "./scripts/domains";
 function virtualExtractorsMapPlugin(registryPath: string, extractorsDir: string, allowed: string[]): esbuild.Plugin {
     const registry: Record<string, { file: string; export: string }> = JSON.parse(readFileSync(registryPath, "utf-8"));
 
+    for (const id of allowed) {
+        if (!registry[id]?.file || !registry[id]?.export) throw new Error(`Unknown extractor "${id}" in ${registryPath}`);
+    }
+
     return {
         name: "virtual-extractors-map",
         setup(build) {
@@ -15,9 +19,9 @@ function virtualExtractorsMapPlugin(registryPath: string, extractorsDir: string,
             }));
             build.onLoad({ filter: /.*/, namespace: "virtual-extractors-map" }, () => {
                 const contents = [
-                    ...allowed.map((id) => `import { ${registry[id].export} } from "./${registry[id].file}";`),
+                    ...allowed.map((id) => `import { ${registry[id]!.export} } from "./${registry[id]!.file}";`),
                     `export const EXTRACTORS = {`,
-                    ...allowed.map((id) => `    ${id}: ${registry[id].export},`),
+                    ...allowed.map((id) => `    ${id}: ${registry[id]!.export},`),
                     `};`,
                 ].join("\n");
 
@@ -40,7 +44,8 @@ function stripExports(code: string): string {
 async function buildExtension(dir: string) {
     const domain = domainForDir(dir);
     const manifestPath = join(dir, "manifest.json");
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const raw = readFileSync(manifestPath, "utf-8");
+    const manifest = JSON.parse(raw);
     const allowed: string[] = manifest.extractors ?? [];
 
     const plugins = manifest.extractors ? [virtualExtractorsMapPlugin(domain.registryPath, domain.itemsDir, allowed)] : [];
@@ -56,10 +61,12 @@ async function buildExtension(dir: string) {
     });
 
     const referenceHeader = `/// <reference path="${domain.declaration}" />\n`;
-    const bundledCode = referenceHeader + stripExports(stripPathComments(result.outputFiles[0].text));
+    const bundledCode = referenceHeader + stripExports(stripPathComments(result.outputFiles[0]!.text));
 
     manifest.payload = bundledCode;
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 4) + "\n");
+
+    const output = JSON.stringify(manifest, null, 4) + "\n";
+    if (output !== raw) writeFileSync(manifestPath, output);
 
     console.log(`✓ built ${dir}`);
 }
@@ -73,7 +80,11 @@ async function main() {
         return;
     }
 
-    await Promise.all(dirs.map(buildExtension));
+    const results = await Promise.allSettled(dirs.map(buildExtension));
+    const failures = results.flatMap((result, index) => (result.status === "rejected" ? [{ dir: dirs[index], reason: result.reason }] : []));
+
+    for (const { dir, reason } of failures) console.error(`✗ failed ${dir}`, reason);
+    if (failures.length > 0) process.exit(1);
 }
 
 main().catch((err) => {
