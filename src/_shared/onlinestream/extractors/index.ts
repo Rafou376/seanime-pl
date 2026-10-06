@@ -1,7 +1,24 @@
 import { EXTRACTORS } from "virtual:extractors-map";
+import { noSources } from "../provider-helpers";
 
 export function extractorNames(): string[] {
     return Object.keys(EXTRACTORS);
+}
+
+function findExtractor(serverName: string): Extractor | undefined {
+    const name = serverName.toLowerCase();
+    const exact = EXTRACTORS[name];
+    if (exact) return exact;
+
+    const key = Object.keys(EXTRACTORS)
+        .filter((candidate) => name.includes(candidate))
+        .sort((a, b) => b.length - a.length)[0];
+
+    return key === undefined ? undefined : EXTRACTORS[key];
+}
+
+export function hasExtractor(serverName: string): boolean {
+    return findExtractor(serverName) !== undefined;
 }
 
 async function isReachable(url: string, headers: Record<string, string>): Promise<boolean> {
@@ -14,10 +31,8 @@ async function isReachable(url: string, headers: Record<string, string>): Promis
 }
 
 export async function extract(serverName: string, playerUrl: string, label: string): Promise<ExtractorResult> {
-    const name = serverName.toLowerCase();
-    const extractor = Object.entries(EXTRACTORS).find(([key]) => name.includes(key))?.[1];
-
-    if (!extractor) return { sources: [] };
+    const extractor = findExtractor(serverName);
+    if (!extractor) return noSources();
 
     const result = await extractor(playerUrl, label);
     const headers = result.headers ?? {};

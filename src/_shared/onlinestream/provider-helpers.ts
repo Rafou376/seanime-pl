@@ -5,6 +5,10 @@ type CollectedSources = {
 
 type ExtractFn<T> = (serverName: string, entry: T) => Promise<ExtractorResult>;
 
+export function noSources(): ExtractorResult {
+    return { sources: [] };
+}
+
 function capitalize(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1);
 }
@@ -19,12 +23,12 @@ export function pickServer(availableServers: string[], server: string): string |
     if (byName) return byName;
 
     const legacy = /^server\s*(\d+)$/i.exec(server);
-    return legacy ? availableServers[parseInt(legacy[1], 10) - 1] : undefined;
+    return legacy?.[1] ? availableServers[parseInt(legacy[1], 10) - 1] : undefined;
 }
 
 async function collectSources<T>(serverName: string, entries: T[], extract: ExtractFn<T>): Promise<CollectedSources> {
     const results = await Promise.all(
-        entries.map((entry) => extract(serverName, entry).catch((): ExtractorResult => ({ sources: [] }))),
+        entries.map((entry) => extract(serverName, entry).catch(noSources)),
     );
 
     const videoSources: VideoSource[] = [];
@@ -42,13 +46,15 @@ export async function resolveEpisodeServer<T>(
     serversMap: Record<string, T[]>,
     server: string,
     extract: ExtractFn<T>,
+    isSupported: (serverName: string) => boolean = () => true,
 ): Promise<EpisodeServer> {
     const availableServers = Object.keys(serversMap).sort();
     const picked = server === "default" ? undefined : pickServer(availableServers, server);
-    const candidates = picked === undefined ? availableServers : [picked, ...availableServers.filter((name) => name !== picked)];
+    const ordered = picked === undefined ? availableServers : [picked, ...availableServers.filter((name) => name !== picked)];
+    const candidates = ordered.filter(isSupported);
 
     for (const name of candidates) {
-        const collected = await collectSources(name, serversMap[name], extract);
+        const collected = await collectSources(name, serversMap[name] ?? [], extract);
         if (collected.videoSources.length > 0) return { server: name, ...collected };
     }
 
