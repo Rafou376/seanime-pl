@@ -1,23 +1,15 @@
 {
+    "extends": "./tsconfig.base.json",
     "compilerOptions": {
-        "target": "ES2020",
-        "module": "ESNext",
-        "moduleResolution": "Bundler",
-        "strict": true,
-        "skipLibCheck": true,
-        "noEmit": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
-        "noImplicitOverride": true,
-        "noUncheckedIndexedAccess": true,
-        "forceConsistentCasingInFileNames": true,
-        "types": ["node"]
+        "types": ["node"],
+        "tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo"
     },
     "include": [
-        "src/onlinestream/**/payload.ts",
-        "src/_shared/onlinestream/**/*.ts",
-        "src/_shared/onlinestream/**/*.d.ts",
         "bundle.ts",
         "scripts/**/*.ts"
+    ],
+    "references": [
+        { "path": "./tsconfig.onlinestream.json" },
+        { "path": "./tsconfig.manga.json" }
     ]
 }

@@ -5,7 +5,7 @@
         "node": ">=20"
     },
     "scripts": {
-        "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.manga.json",
+        "typecheck": "tsc -b",
         "build": "tsx bundle.ts",
         "check": "tsx scripts/check-payloads.ts",
         "bump": "tsx scripts/bump-extension-versions.ts"
