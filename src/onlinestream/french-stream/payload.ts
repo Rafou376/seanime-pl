@@ -35,6 +35,8 @@ type FilmData = {
 };
 
 export class Provider {
+    private readonly episodesCache = new Map<string, Promise<EpisodesData | null>>();
+
     getSettings(): Settings {
         return {
             episodeServers: episodeServerList(extractorNames()),
@@ -55,7 +57,7 @@ export class Provider {
     }
 
     async findEpisodes(id: string): Promise<EpisodeDetails[]> {
-        const json = await fetchJson<EpisodesData>(`${baseUrl}/ep-data.php?id=${id}`);
+        const json = await this.fetchEpisodesData(id);
         if (!json) return [];
 
         const episodeNumbers = new Set([
@@ -72,7 +74,7 @@ export class Provider {
         const episodes = new Map<number, string>();
 
         for (const num of episodeNumbers) {
-            const number = parseInt(num, 10);
+            const number = parseFloat(num);
             if (Number.isFinite(number) && !episodes.has(number)) episodes.set(number, num);
         }
 
@@ -95,8 +97,18 @@ export class Provider {
         return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.version.toUpperCase()), hasExtractor);
     }
 
+    private fetchEpisodesData(id: string): Promise<EpisodesData | null> {
+        const request: Promise<EpisodesData | null> = fetchJson<EpisodesData>(`${baseUrl}/ep-data.php?id=${id}`).then((json) => {
+            if (!json && this.episodesCache.get(id) === request) this.episodesCache.delete(id);
+            return json;
+        });
+
+        this.episodesCache.set(id, request);
+        return request;
+    }
+
     private async getTvServers(episodeInfo: TvEpisodeId): Promise<ServersMap> {
-        const json = (await fetchJson<EpisodesData>(`${baseUrl}/ep-data.php?id=${episodeInfo.id}`)) ?? {};
+        const json = (await (this.episodesCache.get(episodeInfo.id) ?? this.fetchEpisodesData(episodeInfo.id))) ?? {};
         const map: ServersMap = {};
 
         for (const [version, episodes] of Object.entries(json)) {
