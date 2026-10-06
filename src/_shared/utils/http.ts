@@ -12,7 +12,7 @@ export function parseSetCookie(res: { headers: { get(name: string): string | nul
         if (typeof raw !== "string") return cookies;
 
         for (const entry of raw.split(/,(?=\s*[^;,=\s]+=)/)) {
-            const pair = entry.split(";")[0].trim();
+            const pair = (entry.split(";")[0] ?? "").trim();
             const separator = pair.indexOf("=");
             if (separator > 0) cookies[pair.slice(0, separator)] = pair.slice(separator + 1);
         }
