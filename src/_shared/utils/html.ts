@@ -5,7 +5,7 @@ const ORIGIN_RE = /^[a-z][a-z\d+.-]*:\/\/[^/]+/i;
 const ANCHOR_RE = /<a\b[^>]*?\shref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a\s*>/gi;
 const STYLE_URL_RE = /url\(\s*["']?([^"')]+?)["']?\s*\)/i;
 const OPEN_TAG_RE = /^<[^>]+>/;
-const SCRIPT_STYLE_RE = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+const SCRIPT_STYLE_RE = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>|<!--[\s\S]*?-->/gi;
 const ENTITY_RE = /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi;
 const ATTR_RES = new Map<string, RegExp>();
 const REGEX_CACHE = new Map<string, RegExp>();
@@ -17,6 +17,20 @@ const ENTITIES = new Map([
     ["quot", '"'],
     ["apos", "'"],
     ["nbsp", " "],
+    ["rsquo", "\u2019"],
+    ["lsquo", "\u2018"],
+    ["rdquo", "\u201D"],
+    ["ldquo", "\u201C"],
+    ["hellip", "\u2026"],
+    ["ndash", "\u2013"],
+    ["mdash", "\u2014"],
+    ["laquo", "\u00AB"],
+    ["raquo", "\u00BB"],
+    ["eacute", "\u00E9"],
+    ["egrave", "\u00E8"],
+    ["ecirc", "\u00EA"],
+    ["agrave", "\u00E0"],
+    ["ccedil", "\u00E7"],
 ]);
 
 export type Anchor = { href: string; content: string };
@@ -79,26 +93,18 @@ function findOpenTagByClassPrefix(html: string, prefix: string, tag: string): Re
 }
 
 function findMatchingClose(html: string, tagName: string, fromIndex: number): RegExpExecArray | null {
-    const openRe = cachedRegex(`<${tagName}\\b`, "gi");
-    const closeRe = cachedRegex(`</${tagName}\\s*>`, "gi");
+    const re = cachedRegex(`<(/?)${tagName}(?=[\\s>/])[^>]*>`, "gi");
 
     let depth = 1;
-    let cursor = fromIndex;
+    let match: RegExpExecArray | null;
 
-    while (depth > 0) {
-        openRe.lastIndex = cursor;
-        closeRe.lastIndex = cursor;
-        const nextOpen = openRe.exec(html);
-        const nextClose = closeRe.exec(html);
-        if (!nextClose) return null;
+    re.lastIndex = fromIndex;
 
-        if (nextOpen && nextOpen.index < nextClose.index) {
-            depth++;
-            cursor = nextOpen.index + nextOpen[0].length;
+    while ((match = re.exec(html)) !== null) {
+        if (match[1] === "/") {
+            if (--depth === 0) return match;
         } else {
-            depth--;
-            if (depth === 0) return nextClose;
-            cursor = nextClose.index + nextClose[0].length;
+            depth++;
         }
     }
 
@@ -106,7 +112,7 @@ function findMatchingClose(html: string, tagName: string, fromIndex: number): Re
 }
 
 function elementBody(html: string, match: RegExpExecArray): string | null {
-    const tagName = match[1];
+    const tagName = match[1] ?? "";
     if (isVoidMatch(tagName, match[0])) return null;
 
     const startIndex = match.index + match[0].length;
@@ -132,7 +138,7 @@ export function getAttr(
     const backward = cachedRegex(`<${tag}\\b[^>]*${targetPattern}[^>]*${matchPattern}`, "i");
 
     const found = forward.exec(html) ?? backward.exec(html);
-    return found ? (found[1] ?? found[2]) : null;
+    return found ? decodeEntities(found[1] ?? found[2] ?? "") : null;
 }
 
 export function getAttrByClass(html: string, className: string, targetAttr: string, tag?: string): string | null {
@@ -179,7 +185,7 @@ export function getBlocksByClass(html: string, className: string, tag: string = 
     re.lastIndex = 0;
 
     while ((match = re.exec(html)) !== null) {
-        const tagName = match[1];
+        const tagName = match[1] ?? "";
 
         if (isVoidMatch(tagName, match[0])) {
             blocks.push(match[0]);
@@ -203,7 +209,7 @@ export function getFirstLink(html: string, tag: string = "a"): { href: string; t
     const match = cachedRegex(`<(${tag})\\b[^>]*\\shref\\s*=\\s*${ATTR_VALUE}[^>]*>`, "i").exec(html);
     if (!match) return null;
 
-    return { href: match[2] ?? match[3], text: extractElementText(html, match) ?? "" };
+    return { href: decodeEntities(match[2] ?? match[3] ?? ""), text: extractElementText(html, match) ?? "" };
 }
 
 export function getImageSource(tag: string, attrs: string[]): string | null {
@@ -219,7 +225,7 @@ export function getImageSource(tag: string, attrs: string[]): string | null {
 }
 
 export function getImageUrl(html: string, tag: string = "img"): string | null {
-    for (const match of html.matchAll(new RegExp(`<${tag}\\b[^>]*>`, "gi"))) {
+    for (const match of html.matchAll(cachedRegex(`<${tag}\\b[^>]*>`, "gi"))) {
         const url = getImageSource(match[0], ["data-src", "data-lazy-src", "src"]);
         if (url) return url;
     }
@@ -231,7 +237,7 @@ export function decodeEntities(text: string): string {
     return text.replace(ENTITY_RE, (full: string, body: string) => {
         if (body[0] !== "#") return ENTITIES.get(body.toLowerCase()) ?? full;
 
-        const code = body[1].toLowerCase() === "x" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+        const code = body[1]?.toLowerCase() === "x" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
 
         try {
             return String.fromCodePoint(code);
@@ -260,7 +266,7 @@ export function trimLeadingSlashes(value: string): string {
 }
 
 export function relativePath(url: string): string {
-    return trimLeadingSlashes(url.replace(ORIGIN_RE, "").split("#")[0]);
+    return trimLeadingSlashes((url.replace(ORIGIN_RE, "").split("#")[0] ?? ""));
 }
 
 export function getTagAttr(tag: string, name: string): string | null {
@@ -272,22 +278,11 @@ export function getTagAttr(tag: string, name: string): string | null {
     }
 
     const match = re.exec(OPEN_TAG_RE.exec(tag)?.[0] ?? tag);
-    return match ? (match[1] ?? match[2]) : null;
+    return match ? decodeEntities(match[1] ?? match[2] ?? "") : null;
 }
 
 export function getAnchors(html: string): Anchor[] {
-    return [...html.matchAll(ANCHOR_RE)].map((match) => ({ href: match[1] ?? match[2], content: match[3] }));
-}
-
-export function chapterOrderValue(chapter: string): number {
-    const value = parseFloat(chapter);
-    return Number.isNaN(value) ? Number.POSITIVE_INFINITY : value;
-}
-
-export function sortChapters<T extends { chapter: string }>(chapters: T[]): (T & { index: number })[] {
-    return [...chapters]
-        .sort((a, b) => chapterOrderValue(a.chapter) - chapterOrderValue(b.chapter))
-        .map((chapter, index) => ({ ...chapter, index }));
+    return [...html.matchAll(ANCHOR_RE)].map((match) => ({ href: decodeEntities(match[1] ?? match[2] ?? ""), content: match[3] ?? "" }));
 }
 
 export function scriptContaining(html: string, needle: string): string | null {
@@ -295,7 +290,8 @@ export function scriptContaining(html: string, needle: string): string | null {
     let match: RegExpExecArray | null;
 
     while ((match = re.exec(html)) !== null) {
-        if (match[1].includes(needle)) return match[1];
+        const body = match[1];
+        if (body?.includes(needle)) return body;
     }
 
     return null;
