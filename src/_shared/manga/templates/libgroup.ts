@@ -1,5 +1,5 @@
 import { fetchJson } from "../../utils/http";
-import { sortChapters } from "../../utils/html";
+import { sortChapters } from "../provider-helpers";
 
 type MangaShort = {
     name: string;

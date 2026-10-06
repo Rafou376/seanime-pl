@@ -1,6 +1,7 @@
 import { utcIso } from "../../utils/dates";
-import { absUrl, getAttrByClass, getLinkHrefByClass, getTextByClass, scriptContaining, sortChapters, stripTags, trimLeadingSlashes } from "../../utils/html";
+import { absUrl, getAttrByClass, getLinkHrefByClass, getTextByClass, scriptContaining, stripTags, trimLeadingSlashes } from "../../utils/html";
 import { fetchJson, fetchText } from "../../utils/http";
+import { sortChapters } from "../provider-helpers";
 
 type SearchResponse = {
     total: number;
@@ -73,8 +74,8 @@ export abstract class GroupLe {
             const scanlator = this.scanlatorFromTitle(getAttrByClass(row, "chapter-link", "title", "a"));
             const name = this.cleanChapterName(stripTags(getTextByClass(row, "chapter-link", "a") ?? href), title, chapterNumber);
 
-            const dateCells = [...row.matchAll(DATE_CELL_RE)].map((match) => stripTags(match[1]));
-            const dateText = dateCells.length > 0 ? dateCells[dateCells.length - 1] : null;
+            const dateCells = [...row.matchAll(DATE_CELL_RE)].map((match) => stripTags(match[1] ?? ""));
+            const dateText = dateCells[dateCells.length - 1] ?? null;
 
             const chapterId = this.chapterId(href, searchParams);
 
@@ -115,7 +116,7 @@ export abstract class GroupLe {
         const pages: ChapterPage[] = [];
 
         for (const match of source.matchAll(PAGES_RE)) {
-            const [, host, middle, end] = match;
+            const [, host = "", middle = "", end = ""] = match;
             if (!end) continue;
 
             let imageUrl: string;
@@ -128,7 +129,7 @@ export abstract class GroupLe {
             }
 
             if (!imageUrl.includes("://")) imageUrl = `https:${imageUrl}`;
-            if (imageUrl.includes("one-way.work")) imageUrl = imageUrl.split("?")[0];
+            if (imageUrl.includes("one-way.work")) imageUrl = imageUrl.split("?")[0] ?? imageUrl;
             imageUrl = imageUrl.replace("//resh", "//h");
 
             if (!/^https?:\/\//.test(imageUrl)) continue;
@@ -167,18 +168,15 @@ export abstract class GroupLe {
 
     private resolveUserHash(pathname: string): Promise<string | null> {
         if (this.userHash) return Promise.resolve(this.userHash);
-        if (this.userHashRequest) return this.userHashRequest;
 
         const slug = pathname.split("/").filter(Boolean)[0];
         if (!slug) return Promise.resolve(null);
 
-        this.userHashRequest = this.fetchHtml(`${this.baseUrl}/${slug}`).then((html) => {
-            this.userHash = html ? USER_HASH_RE.exec(html)?.[1] ?? null : null;
+        return (this.userHashRequest ??= this.fetchHtml(`${this.baseUrl}/${slug}`).then((html) => {
+            this.userHash = html ? (USER_HASH_RE.exec(html)?.[1] ?? null) : null;
             this.userHashRequest = null;
             return this.userHash;
-        });
-
-        return this.userHashRequest;
+        }));
     }
 
     private chapterSearchParams(html: string): string {
@@ -261,7 +259,7 @@ export abstract class GroupLe {
         const match = DATE_RE.exec(text.trim());
         if (!match) return undefined;
 
-        const [, day, month, rawYear] = match;
+        const [, day = "", month = "", rawYear = ""] = match;
         const year = rawYear.length === 2 ? 2000 + parseInt(rawYear, 10) : parseInt(rawYear, 10);
         return utcIso(year, parseInt(month, 10) - 1, parseInt(day, 10));
     }

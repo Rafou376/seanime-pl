@@ -1,6 +1,7 @@
 import { utcIso } from "../../utils/dates";
-import { absUrl, Anchor, getAnchors, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, sortChapters, stripTags } from "../../utils/html";
+import { absUrl, Anchor, getAnchors, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
 import { cookieHeader, parseSetCookie } from "../../utils/http";
+import { matchChapterNumber, sortChapters } from "../provider-helpers";
 
 type RelativeUnit = {
     words: string[];
@@ -22,18 +23,18 @@ const TRAILING_NUMBER_RE = /(\d+(?:\.\d+)?)(?=\D*$)/;
 const CHAPTER_NUMBER_RES = [/(?:\b(?:ch(?:apter)?|chap)\.?|第|#)\s*(\d+(?:\.\d+)?)/i, /(\d+(?:\.\d+)?)\s*[話话章]/, /(\d+(?:\.\d+)?)/];
 
 function subtractMonths(date: Date, months: number): void {
-    const day = date.getDate();
+    const day = date.getUTCDate();
 
-    date.setDate(1);
-    date.setMonth(date.getMonth() - months);
-    date.setDate(Math.min(day, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()));
+    date.setUTCDate(1);
+    date.setUTCMonth(date.getUTCMonth() - months);
+    date.setUTCDate(Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()));
 }
 
 const RELATIVE_UNITS: RelativeUnit[] = [
-    { words: ["min", "phút", "minuto", "dakika"], subtract: (date, value) => date.setMinutes(date.getMinutes() - value) },
-    { words: ["hour", "giờ", "hora", "saat"], subtract: (date, value) => date.setHours(date.getHours() - value) },
-    { words: ["day", "ngày", "día", "gün"], subtract: (date, value) => date.setDate(date.getDate() - value) },
-    { words: ["week", "tuần", "semana", "hafta"], subtract: (date, value) => date.setDate(date.getDate() - value * 7) },
+    { words: ["min", "phút", "minuto", "dakika"], subtract: (date, value) => date.setUTCMinutes(date.getUTCMinutes() - value) },
+    { words: ["hour", "giờ", "hora", "saat"], subtract: (date, value) => date.setUTCHours(date.getUTCHours() - value) },
+    { words: ["day", "ngày", "día", "gün"], subtract: (date, value) => date.setUTCDate(date.getUTCDate() - value) },
+    { words: ["week", "tuần", "semana", "hafta"], subtract: (date, value) => date.setUTCDate(date.getUTCDate() - value * 7) },
     { words: ["month", "tháng", "mes", "ay"], subtract: (date, value) => subtractMonths(date, value) },
     { words: ["year", "năm", "año", "yıl"], subtract: (date, value) => subtractMonths(date, value * 12) },
 ];
@@ -117,7 +118,7 @@ export abstract class FMReader {
         if (!unit) return undefined;
 
         const date = new Date();
-        date.setSeconds(0, 0);
+        date.setUTCSeconds(0, 0);
         unit.subtract(date, value);
 
         return date.toISOString();
@@ -127,7 +128,7 @@ export abstract class FMReader {
         const match = ABSOLUTE_DATE_RE.exec(text);
         if (!match) return undefined;
 
-        const [, day, month, year] = match;
+        const [, day = "", month = "", year = ""] = match;
         return utcIso(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
     }
 
@@ -161,7 +162,7 @@ export abstract class FMReader {
     }
 
     private resolve(url: string, pageUrl: string): string {
-        return absUrl(url.replace(/&amp;/g, "&").trim(), pageUrl);
+        return absUrl(url.trim(), pageUrl);
     }
 
     private scoped(html: string, className: string | null): string {
@@ -253,13 +254,8 @@ export abstract class FMReader {
 
     private chapterNumber(name: string, id: string): string {
         const patterns = name ? CHAPTER_NUMBER_RES : [TRAILING_NUMBER_RE];
-        const source = name || id.split(/[?#]/)[0].replace(EXTENSION_RE, "");
+        const source = name || (id.split(/[?#]/)[0] ?? "").replace(EXTENSION_RE, "");
 
-        for (const re of patterns) {
-            const number = re.exec(source)?.[1];
-            if (number) return number;
-        }
-
-        return name || id;
+        return matchChapterNumber(source, patterns) ?? (name || id);
     }
 }

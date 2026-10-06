@@ -1,6 +1,7 @@
 import { utcIso } from "../../utils/dates";
-import { absUrl, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix, sortChapters } from "../../utils/html";
+import { absUrl, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix } from "../../utils/html";
 import { fetchForm, fetchText, parseJson } from "../../utils/http";
+import { matchChapterNumber, sortChapters } from "../provider-helpers";
 
 type SearchResponse = {
     success: boolean;
@@ -60,8 +61,7 @@ export abstract class Origines {
 
     private splitSegments(path: string): string[] {
         return path
-            .split("?")[0]
-            .split("#")[0]
+            .split(/[?#]/, 1)[0]!
             .split("/")
             .filter((segment) => segment.length > 0);
     }
@@ -99,7 +99,7 @@ export abstract class Origines {
                 id,
                 url: absUrl(`${this.mangaPath}/${id}/`, this.baseUrl),
                 title: name,
-                chapter: this.chapterNumber(name),
+                chapter: matchChapterNumber(name) ?? name,
                 updatedAt: this.parseChapterDate(dateTitle),
             });
         }
@@ -120,23 +120,19 @@ export abstract class Origines {
             }));
     }
 
-    private chapterNumber(name: string): string {
-        return name.match(/(\d+(?:\.\d+)?)/)?.[1] ?? name;
-    }
-
     private parseChapterDate(date: string | null): string | undefined {
         if (!date) return undefined;
 
         const match = date.match(CHAPTER_DATE_RE);
         if (!match) return undefined;
 
-        const [, day, monthLabel, year] = match;
+        const [, day = "", monthLabel = "", year = ""] = match;
         const month = this.monthNumber(monthLabel);
         if (month === undefined) return undefined;
 
         const dayNumber = parseInt(day, 10);
         const now = new Date();
-        let resolvedYear = year ? parseInt(year, 10) : now.getFullYear();
+        let resolvedYear = year ? parseInt(year, 10) : now.getUTCFullYear();
 
         if (!year && Date.UTC(resolvedYear, month, dayNumber) > now.getTime()) resolvedYear -= 1;
 
