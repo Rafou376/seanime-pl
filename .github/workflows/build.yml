@@ -62,6 +62,6 @@ jobs:
         if: steps.build.outputs.manifests != ''
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          commit_message: "chore: rebuild manifest.json for updated extensions"
+          commit_message: "chore: rebuild updated extensions"
           file_pattern: ${{ steps.build.outputs.manifests }}
           commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
