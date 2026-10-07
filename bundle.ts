@@ -1,11 +1,9 @@
 import * as esbuild from "esbuild";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import { DOMAINS, findExtensionDirs, domainForDir } from "./scripts/domains";
+import { DOMAINS, Registry, domainForDir, findExtensionDirs, readRegistry } from "./scripts/domains";
 
-function virtualExtractorsMapPlugin(registryPath: string, extractorsDir: string, allowed: string[]): esbuild.Plugin {
-    const registry: Record<string, { file: string; export: string }> = JSON.parse(readFileSync(registryPath, "utf-8"));
-
+function virtualExtractorsMapPlugin(registry: Registry, registryPath: string, extractorsDir: string, allowed: string[]): esbuild.Plugin {
     for (const id of allowed) {
         if (!registry[id]?.file || !registry[id]?.export) throw new Error(`Unknown extractor "${id}" in ${registryPath}`);
     }
@@ -48,7 +46,7 @@ async function buildExtension(dir: string) {
     const manifest = JSON.parse(raw);
     const allowed: string[] = manifest.extractors ?? [];
 
-    const plugins = manifest.extractors ? [virtualExtractorsMapPlugin(domain.registryPath, domain.itemsDir, allowed)] : [];
+    const plugins = manifest.extractors ? [virtualExtractorsMapPlugin(readRegistry(domain), domain.registryPath, domain.itemsDir, allowed)] : [];
 
     const result = await esbuild.build({
         entryPoints: [join(dir, "payload.ts")],
@@ -56,7 +54,6 @@ async function buildExtension(dir: string) {
         write: false,
         target: "es2020",
         platform: "neutral",
-        treeShaking: true,
         charset: "utf8",
         plugins,
     });

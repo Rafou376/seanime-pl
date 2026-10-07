@@ -1,28 +1,30 @@
 import { readFileSync, writeFileSync } from "fs";
 import { posix } from "path";
-import { DOMAINS, declaredIds, findExtensionDirs } from "./domains";
+import { DOMAINS, Registry, declaredIds, findExtensionDirs, readRegistry } from "./domains";
 import { showAt } from "./git";
 
 const base = process.argv[2];
+
+if (!base) {
+    process.exit(0);
+}
 
 function bumpPatch(version: string): string {
     const [major, minor, patch] = version.split(".");
     return [major, minor, Number(patch ?? 0) + 1].join(".");
 }
 
-if (!base) {
-    process.exit(0);
-}
-
 for (const domain of DOMAINS) {
-    const oldRegistry = JSON.parse(showAt(base, domain.registryPath) ?? "{}");
-    const newRegistry = JSON.parse(readFileSync(domain.registryPath, "utf-8"));
+    const oldRegistry: Registry = JSON.parse(showAt(base, domain.registryPath) ?? "{}");
+    const newRegistry = readRegistry(domain);
 
     const bumped = Object.keys(newRegistry).filter((id) => {
         const oldVersion = oldRegistry[id]?.version;
         const newVersion = newRegistry[id]?.version;
 
         return (
+            oldVersion !== undefined &&
+            newVersion !== undefined &&
             Number.isInteger(oldVersion) &&
             Number.isInteger(newVersion) &&
             oldVersion > 0 &&
