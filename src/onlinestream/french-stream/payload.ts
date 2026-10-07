@@ -1,6 +1,6 @@
 /// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
 import { extract, extractorNames, hasExtractor } from "../../_shared/onlinestream/extractors";
-import { episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
+import { emptyServer, episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
 import { decodeEntities } from "../../_shared/utils/html";
 import { fetchForm, fetchJson, parseJson } from "../../_shared/utils/http";
 
@@ -52,7 +52,7 @@ export class Provider {
             id,
             title: decodeEntities(title.trim()),
             url: `${baseUrl}/${id}-${slug}.html`,
-            subOrDub: "both" as const,
+            subOrDub: "both",
         }));
     }
 
@@ -88,7 +88,7 @@ export class Provider {
 
     async findEpisodeServer(episode: EpisodeDetails, server: string): Promise<EpisodeServer> {
         const episodeInfo = parseJson<EpisodeId>(episode.id);
-        if (!episodeInfo) return { server, headers: {}, videoSources: [] };
+        if (!episodeInfo) return emptyServer(server);
 
         const serversMap = episodeInfo.type === "tv"
             ? await this.getTvServers(episodeInfo)

@@ -9,6 +9,10 @@ export function noSources(): ExtractorResult {
     return { sources: [] };
 }
 
+export function emptyServer(server: string): EpisodeServer {
+    return { server, headers: {}, videoSources: [] };
+}
+
 function capitalize(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1);
 }
@@ -32,11 +36,11 @@ async function collectSources<T>(serverName: string, entries: T[], extract: Extr
     );
 
     const videoSources: VideoSource[] = [];
-    let headers: { [key: string]: string } = {};
+    const headers: { [key: string]: string } = {};
 
     for (const result of results) {
         videoSources.push(...result.sources);
-        if (result.headers) headers = { ...headers, ...result.headers };
+        Object.assign(headers, result.headers);
     }
 
     return { headers, videoSources };
@@ -58,5 +62,5 @@ export async function resolveEpisodeServer<T>(
         if (collected.videoSources.length > 0) return { server: name, ...collected };
     }
 
-    return { server: candidates[0] ?? server, headers: {}, videoSources: [] };
+    return emptyServer(candidates[0] ?? server);
 }
