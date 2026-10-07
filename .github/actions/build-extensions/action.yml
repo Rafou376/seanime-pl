@@ -9,6 +9,12 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Setup Node
+      uses: actions/setup-node@v7
+      with:
+        node-version: 22
+        cache: npm
+
     - name: Install dependencies
       shell: bash
       run: npm ci
@@ -35,7 +41,6 @@ runs:
         fi
 
     - name: Bump extension versions for changed extractors
-      if: steps.base.outputs.ref != ''
       shell: bash
       env:
         BASE: ${{ steps.base.outputs.ref }}
@@ -47,11 +52,7 @@ runs:
       env:
         BASE: ${{ steps.base.outputs.ref }}
       run: |
-        if [ -n "$BASE" ]; then
-          DIRS=$(npx tsx scripts/concerned-extensions.ts "$BASE" HEAD)
-        else
-          DIRS=$(npx tsx scripts/concerned-extensions.ts)
-        fi
+        DIRS=$(npx tsx scripts/concerned-extensions.ts "$BASE")
 
         DELIMITER="dirs_$(openssl rand -hex 8)"
         echo "dirs<<$DELIMITER" >> "$GITHUB_OUTPUT"
