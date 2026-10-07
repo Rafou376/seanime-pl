@@ -12,7 +12,6 @@
         "noUnusedParameters": true,
         "noImplicitOverride": true,
         "noUncheckedIndexedAccess": true,
-        "forceConsistentCasingInFileNames": true,
         "types": []
     }
 }

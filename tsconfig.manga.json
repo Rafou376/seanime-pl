@@ -6,7 +6,6 @@
     "include": [
         "src/manga/**/payload.ts",
         "src/_shared/manga/**/*.ts",
-        "src/_shared/manga/**/*.d.ts",
         "src/_shared/utils/**/*.ts"
     ]
 }
