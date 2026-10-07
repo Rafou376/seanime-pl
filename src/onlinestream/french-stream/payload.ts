@@ -6,6 +6,9 @@ import { fetchForm, fetchJson, parseJson } from "../../_shared/utils/http";
 
 const baseUrl = "https://french-stream.net";
 
+const IGNORED_SERVERS = new Set(["premium"]);
+const NON_VERSION_KEYS = new Set(["info"]);
+
 const SEARCH_RE = /location\.href='\/(\d+)-([^']+?)\.html'(?:(?!location\.href=)[\s\S])*?<div class='search-title'>([^<]+)<\/div>/g;
 
 type MovieEpisodeId = {
@@ -34,6 +37,10 @@ type FilmData = {
     players?: Record<string, Record<string, string>>;
 };
 
+function episodeVersions(data: EpisodesData): [string, EpisodesData[string]][] {
+    return Object.entries(data).filter(([key]) => !NON_VERSION_KEYS.has(key));
+}
+
 export class Provider {
     private readonly episodesCache = new Map<string, Promise<EpisodesData | null>>();
 
@@ -60,11 +67,7 @@ export class Provider {
         const json = await this.fetchEpisodesData(id);
         if (!json) return [];
 
-        const episodeNumbers = new Set([
-            ...Object.keys(json.vf ?? {}),
-            ...Object.keys(json.vostfr ?? {}),
-            ...Object.keys(json.vo ?? {}),
-        ]);
+        const episodeNumbers = new Set(episodeVersions(json).flatMap(([, episodes]) => Object.keys(episodes ?? {})));
 
         if (episodeNumbers.size === 0) {
             const episodeId = JSON.stringify({ id, type: "movie" });
@@ -111,11 +114,11 @@ export class Provider {
         const json = (await (this.episodesCache.get(episodeInfo.id) ?? this.fetchEpisodesData(episodeInfo.id))) ?? {};
         const map: ServersMap = {};
 
-        for (const [version, episodes] of Object.entries(json)) {
+        for (const [version, episodes] of episodeVersions(json)) {
             const servers = episodes?.[episodeInfo.num] ?? {};
 
             for (const [name, url] of Object.entries(servers)) {
-                if (name === "premium" || !url) continue;
+                if (IGNORED_SERVERS.has(name) || !url) continue;
                 (map[name] ??= []).push({ url, version });
             }
         }
@@ -128,7 +131,7 @@ export class Provider {
         const map: ServersMap = {};
 
         for (const [name, versions] of Object.entries(json?.players ?? {})) {
-            if (name === "premium") continue;
+            if (IGNORED_SERVERS.has(name)) continue;
 
             const entries = Object.entries(versions);
 
