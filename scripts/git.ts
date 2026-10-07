@@ -8,9 +8,9 @@ export function showAt(ref: string, path: string): string | null {
     }
 }
 
-export function changedFiles(...refs: string[]): string[] {
+export function changedFiles(base: string): string[] {
     try {
-        return execFileSync("git", ["diff", "--name-only", ...refs], { encoding: "utf-8" }).split("\n").filter(Boolean);
+        return execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf-8" }).split("\n").filter(Boolean);
     } catch {
         return [];
     }

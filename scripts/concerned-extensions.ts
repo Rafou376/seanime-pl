@@ -1,48 +1,48 @@
 import { readFileSync } from "fs";
 import { basename, dirname, join } from "path";
-import { DOMAINS, Domain, declaredIds, findExtensionDirs } from "./domains";
+import { DOMAINS, Domain, UTILS_ROOT, declaredIds, findExtensionDirs, readRegistry } from "./domains";
 import { changedFiles as gitChangedFiles } from "./git";
 
-const diffRefs = process.argv.slice(2).filter(Boolean);
-const changedFiles = diffRefs.length > 0 ? gitChangedFiles(...diffRefs) : [];
+const base = process.argv[2];
+const changedFiles = base ? gitChangedFiles(base) : [];
 
-function printAndExit(dirs: string[]) {
-    console.log(Array.from(new Set(dirs)).sort().join("\n"));
-}
+function isSharedChange(file: string, domain: Domain): boolean {
+    if (file.startsWith(`${UTILS_ROOT}/`)) return true;
+    if (!file.startsWith(`${domain.sharedRoot}/`)) return false;
 
-const allDirs = DOMAINS.flatMap((domain) => findExtensionDirs(domain.root)).sort();
-
-if (changedFiles.length === 0 || changedFiles.some((file) => file === "bundle.ts" || file === "scripts/domains.ts")) {
-    printAndExit(allDirs);
-    process.exit(0);
+    return !file.startsWith(`${domain.itemsDir}/`) || basename(file) === "index.ts";
 }
 
 function concernedForDomain(domain: Domain): string[] {
     const dirs = findExtensionDirs(domain.root);
 
-    const changedItems = changedFiles
-        .filter((f) => f.startsWith(`${domain.itemsDir}/`) && f.endsWith(".ts"))
-        .map((f) => basename(f, ".ts"))
-        .filter((id) => id !== "types" && id !== "index");
+    if (changedFiles.some((file) => isSharedChange(file, domain))) return dirs;
 
-    const otherSharedChanged = changedFiles.some((f) => f.startsWith(`${domain.sharedRoot}/`) && !f.startsWith(`${domain.itemsDir}/`));
-    
-    if (otherSharedChanged) {
-        return dirs;
-    }
+    const registry = readRegistry(domain);
+    const changedItems = Object.entries(registry)
+        .filter(([id, entry]) => changedFiles.includes(`${domain.itemsDir}/${entry.file ?? id}.ts`))
+        .map(([id]) => id);
 
     const directlyChangedDirs = changedFiles
-        .filter((f) => f.startsWith(`${domain.root}/`) && ["payload.ts", "manifest.json"].includes(basename(f)))
-        .map((f) => dirname(f));
+        .filter((file) => ["payload.ts", "manifest.json"].includes(basename(file)))
+        .map((file) => dirname(file))
+        .filter((dir) => dirs.includes(dir));
 
-    const dependentDirs = dirs.filter((dir) => {
-        if (changedItems.length === 0) return false;
-        const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
-        const declared = declaredIds(manifest, domain.manifestField);
-        return changedItems.some((id) => declared.includes(id));
-    });
+    const dependentDirs =
+        changedItems.length === 0
+            ? []
+            : dirs.filter((dir) => {
+                  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+                  return declaredIds(manifest, domain.manifestField).some((id) => changedItems.includes(id));
+              });
 
     return [...directlyChangedDirs, ...dependentDirs];
 }
 
-printAndExit(DOMAINS.flatMap(concernedForDomain));
+function concernedDirs(): string[] {
+    const rebuildAll = changedFiles.length === 0 || changedFiles.some((file) => file === "bundle.ts" || file === "scripts/domains.ts");
+
+    return rebuildAll ? DOMAINS.flatMap((domain) => findExtensionDirs(domain.root)) : DOMAINS.flatMap(concernedForDomain);
+}
+
+console.log(Array.from(new Set(concernedDirs())).sort().join("\n"));
