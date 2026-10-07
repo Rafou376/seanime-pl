@@ -1,4 +1,8 @@
-export function matchChapterNumber(source: string, patterns: RegExp[] = [/(\d+(?:\.\d+)?)/]): string | null {
+export const ANY_NUMBER_RE = /(\d+(?:\.\d+)?)/;
+
+const DEFAULT_NUMBER_RES = [ANY_NUMBER_RE];
+
+export function matchChapterNumber(source: string, patterns: RegExp[] = DEFAULT_NUMBER_RES): string | null {
     for (const re of patterns) {
         const number = re.exec(source)?.[1];
         if (number) return number;
