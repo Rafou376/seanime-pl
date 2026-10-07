@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs";
 import { basename, join } from "path";
 import { Script } from "vm";
-import { DOMAINS, findExtensionDirs } from "./domains";
+import { DOMAINS, declaredIds, findExtensionDirs, readRegistry } from "./domains";
 
 let failed = false;
 
@@ -15,6 +15,8 @@ function text(value: unknown): string {
 }
 
 for (const domain of DOMAINS) {
+    const registry = readRegistry(domain);
+
     for (const dir of findExtensionDirs(domain.root)) {
         const manifestPath = join(dir, "manifest.json");
         const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
@@ -51,6 +53,10 @@ for (const domain of DOMAINS) {
         }
         if (!/^\d+\.\d+\.\d+$/.test(text(manifest.version))) {
             fail(manifestPath, `has version "${text(manifest.version)}" which is not a valid MAJOR.MINOR.PATCH version`);
+        }
+
+        for (const id of declaredIds(manifest, domain.manifestField)) {
+            if (!registry[id]) fail(manifestPath, `declares unknown ${domain.manifestField} "${id}"`);
         }
 
         const manifestSuffix = `/${dir}/manifest.json`;
