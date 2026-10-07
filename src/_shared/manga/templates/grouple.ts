@@ -1,5 +1,5 @@
 import { utcIso } from "../../utils/dates";
-import { absUrl, getAttrByClass, getLinkHrefByClass, getTextByClass, scriptContaining, stripTags, trimLeadingSlashes } from "../../utils/html";
+import { absUrl, getAttrByClass, getBlocksByClass, getLinkHrefByClass, getTextByClass, isAbsoluteUrl, scriptContaining, stripTags, trimLeadingSlashes } from "../../utils/html";
 import { fetchJson, fetchText } from "../../utils/http";
 import { sortChapters } from "../provider-helpers";
 
@@ -17,14 +17,15 @@ type SearchResponseItem = {
 };
 
 const USER_HASH_RE = /user_hash["']?\s*[:=]\s*["']([^"']+)["']/;
-const EXTRA_RE = /\s*([0-9]+\sЭкстра)\s*/;
-const SINGLE_RE = /\s*Сингл\s*/;
+const EXTRA_RE = /[0-9]+\sЭкстра/;
 const PAGES_RE = /\[['"](.*?)['"],['"](.*?)['"],['"](.*?)['"].*?]/g;
 const DATE_RE = /(\d{1,2})\.(\d{1,2})\.(\d{2,4})/;
-const CHAPTER_ROW_RE = /<tr\b[^>]*\bclass=["'][^"']*\bitem-row\b[^"']*["'][^>]*>[\s\S]*?<\/tr>/gi;
-const DATE_CELL_RE = /<td\b[^>]*\bclass=["'][^"']*\bd-none\b[^"']*["'][^>]*>([\s\S]*?)<\/td>/gi;
 const READER_MARKS = ["rm_h.readerInit(", "rm_h.readerDoInit("];
 const USER_AGENT = "arora";
+
+function extractUserHash(html: string): string | null {
+    return USER_HASH_RE.exec(html)?.[1] ?? null;
+}
 
 export abstract class GroupLe {
     protected abstract readonly siteId: number;
@@ -63,7 +64,7 @@ export abstract class GroupLe {
 
         const chapters: Omit<ChapterDetails, "index">[] = [];
 
-        for (const row of html.match(CHAPTER_ROW_RE) ?? []) {
+        for (const row of getBlocksByClass(html, "item-row", "tr")) {
             const href = getLinkHrefByClass(row, "chapter-link", "a");
             if (!href) continue;
 
@@ -73,8 +74,8 @@ export abstract class GroupLe {
             const scanlator = this.scanlatorFromTitle(getAttrByClass(row, "chapter-link", "title", "a"));
             const name = this.cleanChapterName(getTextByClass(row, "chapter-link", "a") ?? href, title, chapterNumber);
 
-            const dateCells = [...row.matchAll(DATE_CELL_RE)].map((match) => stripTags(match[1] ?? ""));
-            const dateText = dateCells[dateCells.length - 1] ?? null;
+            const lastDateCell = getBlocksByClass(row, "d-none", "td").pop();
+            const dateText = lastDateCell ? stripTags(lastDateCell) : null;
 
             const chapterId = this.chapterId(href, searchParams);
 
@@ -131,7 +132,7 @@ export abstract class GroupLe {
             if (imageUrl.includes("one-way.work")) imageUrl = imageUrl.split("?")[0] ?? imageUrl;
             imageUrl = imageUrl.replace("//resh", "//h");
 
-            if (!/^https?:\/\//.test(imageUrl)) continue;
+            if (!isAbsoluteUrl(imageUrl)) continue;
 
             pages.push({
                 url: imageUrl,
@@ -149,12 +150,10 @@ export abstract class GroupLe {
         if (!value.includes("?") && value.includes("%3F")) {
             try {
                 value = decodeURIComponent(value);
-            } catch {
-                value = rawId.trim();
-            }
+            } catch {}
         }
 
-        const url = new URL(/^https?:\/\//.test(value) ? value : `${this.baseUrl}/${trimLeadingSlashes(value)}`);
+        const url = new URL(isAbsoluteUrl(value) ? value : `${this.baseUrl}/${trimLeadingSlashes(value)}`);
         url.searchParams.set("mtr", "true");
 
         if (!url.searchParams.get("d")) {
@@ -172,14 +171,14 @@ export abstract class GroupLe {
         if (!slug) return Promise.resolve(null);
 
         return (this.userHashRequest ??= this.fetchHtml(`${this.baseUrl}/${slug}`).then((html) => {
-            this.userHash = html ? (USER_HASH_RE.exec(html)?.[1] ?? null) : null;
+            this.userHash = html ? extractUserHash(html) : null;
             this.userHashRequest = null;
             return this.userHash;
         }));
     }
 
     private chapterSearchParams(html: string): string {
-        const hash = USER_HASH_RE.exec(html)?.[1] ?? null;
+        const hash = extractUserHash(html);
         if (hash) this.userHash = hash;
 
         return hash ? `?d=${hash}&mtr=true` : "?mtr=true";
@@ -207,7 +206,7 @@ export abstract class GroupLe {
     }
 
     private chapterId(href: string, searchParams: string): string {
-        const path = /^https?:/i.test(href) ? new URL(href).pathname : href;
+        const path = isAbsoluteUrl(href) ? new URL(href).pathname : href;
         return `${path}${searchParams}`;
     }
 
@@ -243,7 +242,7 @@ export abstract class GroupLe {
             if (name.split("Экстра")[1]?.trim() === "") {
                 name = name.replace(" ", ` - ${chapterNumber} `);
             }
-        } else if (SINGLE_RE.test(name)) {
+        } else if (name.includes("Сингл")) {
             if (name.split("Сингл")[1]?.trim() === "") {
                 name = `${chapterNumber} ${name}`;
             }
