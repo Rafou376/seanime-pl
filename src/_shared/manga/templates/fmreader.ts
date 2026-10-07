@@ -1,6 +1,6 @@
 import { utcIso } from "../../utils/dates";
 import { absUrl, type Anchor, getAnchors, getBlockByClass, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
-import { cookieHeader, parseSetCookie } from "../../utils/http";
+import { cookieHeader, fetchResponse, parseSetCookie } from "../../utils/http";
 import { ANY_NUMBER_RE, matchChapterNumber, sortChapters } from "../provider-helpers";
 
 type RelativeUnit = {
@@ -143,18 +143,12 @@ export abstract class FMReader {
     }
 
     private async fetchPage(url: string, extra: Record<string, string> = {}, sessionCookies: Record<string, string> = {}): Promise<Page | null> {
-        try {
-            const res = await fetch(url, { headers: this.buildHeaders(extra, sessionCookies) });
-            if (!res.ok) {
-                console.error(`[FMReader] ${res.status} ${url}`);
-                return null;
-            }
+        const res = await fetchResponse(url, { headers: this.buildHeaders(extra, sessionCookies) });
+        if (!res) return null;
 
-            return { html: await res.text(), cookies: { ...sessionCookies, ...parseSetCookie(res) } };
-        } catch (error) {
-            console.error(`[FMReader] ${url}`, error);
-            return null;
-        }
+        const html = await res.text().catch(() => null);
+
+        return html === null ? null : { html, cookies: { ...sessionCookies, ...parseSetCookie(res) } };
     }
 
     private async fetchHtml(url: string): Promise<string | null> {
