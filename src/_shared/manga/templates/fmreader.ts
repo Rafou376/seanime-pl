@@ -1,7 +1,7 @@
 import { utcIso } from "../../utils/dates";
-import { absUrl, type Anchor, getAnchors, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
+import { absUrl, type Anchor, getAnchors, getBlockByClass, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
 import { cookieHeader, parseSetCookie } from "../../utils/http";
-import { matchChapterNumber, sortChapters } from "../provider-helpers";
+import { ANY_NUMBER_RE, matchChapterNumber, sortChapters } from "../provider-helpers";
 
 type RelativeUnit = {
     words: string[];
@@ -20,7 +20,7 @@ const ABSOLUTE_DATE_RE = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
 const EXTENSION_RE = /\.[a-z]+$/i;
 const TRAILING_NUMBER_RE = /(\d+(?:\.\d+)?)(?=\D*$)/;
 
-const CHAPTER_NUMBER_RES = [/(?:\b(?:ch(?:apter)?|chap)\.?|第|#)\s*(\d+(?:\.\d+)?)/i, /(\d+(?:\.\d+)?)\s*[話话章]/, /(\d+(?:\.\d+)?)/];
+const CHAPTER_NUMBER_RES = [/(?:\b(?:ch(?:apter)?|chap)\.?|第|#)\s*(\d+(?:\.\d+)?)/i, /(\d+(?:\.\d+)?)\s*[話话章]/, ANY_NUMBER_RE];
 
 function subtractMonths(date: Date, months: number): void {
     const day = date.getUTCDate();
@@ -173,7 +173,7 @@ export abstract class FMReader {
         const results: SearchResult[] = [];
 
         for (const card of getBlocksByClass(this.scoped(html, this.mangaListClass), this.mangaCardClass)) {
-            const titleBlock = getBlocksByClass(card, this.mangaTitleClass)[0];
+            const titleBlock = getBlockByClass(card, this.mangaTitleClass);
             const link = titleBlock ? getFirstLink(titleBlock) : null;
             if (!link?.text) continue;
 
@@ -188,7 +188,7 @@ export abstract class FMReader {
     }
 
     private coverUrl(card: string, pageUrl: string): string | undefined {
-        const cover = getBlocksByClass(card, this.mangaCoverClass)[0] ?? card.match(IMG_TAG_RE)?.[0];
+        const cover = getBlockByClass(card, this.mangaCoverClass) ?? card.match(IMG_TAG_RE)?.[0];
 
         return cover ? this.imgAttr(cover, IMG_ATTRS, pageUrl) : undefined;
     }
