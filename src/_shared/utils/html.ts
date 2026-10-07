@@ -2,6 +2,7 @@ const ANY_TAG = "[a-zA-Z][a-zA-Z0-9]*";
 const ATTR_VALUE = `(?:"([^"]*)"|'([^']*)')`;
 
 const ORIGIN_RE = /^[a-z][a-z\d+.-]*:\/\/[^/]+/i;
+const HTTP_URL_RE = /^https?:\/\//i;
 const ANCHOR_RE = /<a\b[^>]*?\shref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a\s*>/gi;
 const STYLE_URL_RE = /url\(\s*["']?([^"')]+?)["']?\s*\)/i;
 const OPEN_TAG_RE = /^<[^>]+>/;
@@ -9,7 +10,7 @@ const SCRIPT_STYLE_RE = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>|<!--[\s\S]*?--
 const ENTITY_RE = /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi;
 const SRCSET_CANDIDATE_RE = /(\S+?)(?:\s+(\d+(?:\.\d+)?)[wx]\s*(?:,|$)|\s*(?:,\s+|,?$))/g;
 const DATA_URL_RE = /^data:/i;
-const ATTR_RES = new Map<string, RegExp>();
+const SCRIPT_RE = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
 const REGEX_CACHE = new Map<string, RegExp>();
 
 const ENTITIES = new Map([
@@ -92,6 +93,10 @@ function attrPattern(name: string, value: string, mode: MatchMode): string {
     return `\\s${escapeRegExp(name)}\\s*=\\s*(?:"${attrValuePattern(escaped, '"', mode)}"|'${attrValuePattern(escaped, "'", mode)}')`;
 }
 
+function attrCapture(name: string): string {
+    return `\\s${escapeRegExp(name)}\\s*=\\s*${ATTR_VALUE}`;
+}
+
 function openTagPattern(className: string, tag: string): string {
     return `<(${tag})\\b[^>]*${attrPattern("class", className, "word")}[^>]*>`;
 }
@@ -108,8 +113,12 @@ function hasClassPrefix(openTag: string, prefix: string): boolean {
     return classTokens(openTag).some((token) => token.startsWith(prefix));
 }
 
+function openTags(html: string, tag: string) {
+    return html.matchAll(cachedRegex(`<(${tag})\\b[^>]*>`, "gi"));
+}
+
 function findOpenTagByClassPrefix(html: string, prefix: string, tag: string): RegExpExecArray | null {
-    for (const match of html.matchAll(cachedRegex(`<(${tag})\\b[^>]*>`, "gi"))) {
+    for (const match of openTags(html, tag)) {
         if (hasClassPrefix(match[0], prefix)) return match;
     }
 
@@ -156,7 +165,7 @@ function getAttr(
     tag: string = ANY_TAG,
 ): string | null {
     const matchPattern = attrPattern(match.attr, match.value, match.exact ? "exact" : "word");
-    const targetPattern = `\\s${escapeRegExp(targetAttr)}\\s*=\\s*${ATTR_VALUE}`;
+    const targetPattern = attrCapture(targetAttr);
 
     const forward = cachedRegex(`<${tag}\\b[^>]*${matchPattern}[^>]*${targetPattern}`, "i");
     const backward = cachedRegex(`<${tag}\\b[^>]*${targetPattern}[^>]*${matchPattern}`, "i");
@@ -185,7 +194,7 @@ export function getTextByClass(html: string, className: string, tag: string = AN
 }
 
 export function getTextByClassPrefix(html: string, prefix: string, tag: string = ANY_TAG): string | null {
-    for (const match of html.matchAll(cachedRegex(`<(${tag})\\b[^>]*>`, "gi"))) {
+    for (const match of openTags(html, tag)) {
         if (!hasClassPrefix(match[0], prefix)) continue;
 
         const body = elementBody(html, match);
@@ -198,12 +207,12 @@ export function getTextByClassPrefix(html: string, prefix: string, tag: string =
     return null;
 }
 
-export function getBlocksByClass(html: string, className: string, tag: string = ANY_TAG): string[] {
+export function getBlocksByClass(html: string, className: string, tag: string = ANY_TAG, limit: number = Infinity): string[] {
     const re = cachedRegex(openTagPattern(className, tag), "gi");
     const blocks: string[] = [];
     let match: RegExpExecArray | null;
 
-    while ((match = re.exec(html)) !== null) {
+    while (blocks.length < limit && (match = re.exec(html)) !== null) {
         const tagName = match[1] ?? "";
 
         if (isVoidMatch(tagName, match[0])) {
@@ -222,6 +231,10 @@ export function getBlocksByClass(html: string, className: string, tag: string = 
     }
 
     return blocks;
+}
+
+export function getBlockByClass(html: string, className: string, tag: string = ANY_TAG): string | null {
+    return getBlocksByClass(html, className, tag, 1)[0] ?? null;
 }
 
 export function getFirstLink(html: string, tag: string = "a"): { href: string; text: string } | null {
@@ -258,7 +271,7 @@ export function getImageSource(tag: string, attrs: string[]): string | null {
 }
 
 export function getImageUrl(html: string, tag: string = "img"): string | null {
-    for (const match of html.matchAll(cachedRegex(`<${tag}\\b[^>]*>`, "gi"))) {
+    for (const match of openTags(html, tag)) {
         const url = getImageSource(match[0], ["data-src", "data-lazy-src", "src"]);
         if (url) return url;
     }
@@ -294,23 +307,20 @@ export function absUrl(path: string, baseUrl: string): string {
     }
 }
 
+export function isAbsoluteUrl(url: string): boolean {
+    return HTTP_URL_RE.test(url);
+}
+
 export function trimLeadingSlashes(value: string): string {
     return value.replace(/^\/+/, "");
 }
 
 export function relativePath(url: string): string {
-    return trimLeadingSlashes((url.replace(ORIGIN_RE, "").split("#")[0] ?? ""));
+    return trimLeadingSlashes(url.replace(ORIGIN_RE, "").split("#")[0] ?? "");
 }
 
 function getTagAttr(tag: string, name: string): string | null {
-    let re = ATTR_RES.get(name);
-
-    if (!re) {
-        re = new RegExp(`\\s${escapeRegExp(name)}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "i");
-        ATTR_RES.set(name, re);
-    }
-
-    const match = re.exec(OPEN_TAG_RE.exec(tag)?.[0] ?? tag);
+    const match = cachedRegex(attrCapture(name), "i").exec(OPEN_TAG_RE.exec(tag)?.[0] ?? tag);
     return match ? decodeEntities(match[1] ?? match[2] ?? "") : null;
 }
 
@@ -319,10 +329,7 @@ export function getAnchors(html: string): Anchor[] {
 }
 
 export function scriptContaining(html: string, needle: string): string | null {
-    const re = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
-    let match: RegExpExecArray | null;
-
-    while ((match = re.exec(html)) !== null) {
+    for (const match of html.matchAll(SCRIPT_RE)) {
         const body = match[1];
         if (body?.includes(needle)) return body;
     }
