@@ -1,4 +1,5 @@
 import { fetchJson } from "../../utils/http";
+import { memoizeAsync } from "../../utils/memo";
 import { sortChapters } from "../provider-helpers";
 
 type MangaShort = {
@@ -53,7 +54,7 @@ export abstract class LibGroup {
     protected abstract readonly apiUrl: string;
 
     protected readonly imgApiUrl: string = "https://api.cdnlibs.org";
-    private imgUrlRequest: Promise<string | null> | null = null;
+    private readonly getImgUrl = memoizeAsync(() => this.loadImgUrl());
 
     getSettings(): Settings {
         return { supportsMultiScanlator: true };
@@ -98,7 +99,7 @@ export abstract class LibGroup {
         const pages = json?.data?.pages;
         if (!pages || !server) return [];
 
-        return pages
+        return [...pages]
             .sort((a, b) => a.slug - b.slug)
             .map((page, index) => ({
                 url: `${server}${page.url}`,
@@ -125,15 +126,6 @@ export abstract class LibGroup {
             scanlator: branch?.teams[0]?.name ?? branch?.user.username,
             updatedAt: branch?.created_at,
         };
-    }
-
-    private getImgUrl(): Promise<string | null> {
-        return (this.imgUrlRequest ??= this.loadImgUrl()
-            .catch(() => null)
-            .then((url) => {
-                if (!url) this.imgUrlRequest = null;
-                return url;
-            }));
     }
 
     private async loadImgUrl(): Promise<string | null> {
