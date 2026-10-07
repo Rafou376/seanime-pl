@@ -10,6 +10,11 @@ const SCRIPT_STYLE_RE = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>|<!--[\s\S]*?--
 const ENTITY_RE = /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi;
 const SRCSET_CANDIDATE_RE = /(\S+?)(?:\s+(\d+(?:\.\d+)?)[wx]\s*(?:,|$)|\s*(?:,\s+|,?$))/g;
 const DATA_URL_RE = /^data:/i;
+const TAG_RE = /<[^>]+>/g;
+const WHITESPACE_RE = /\s+/g;
+const LEADING_SLASHES_RE = /^\/+/;
+const SELF_CLOSING_RE = /\/>\s*$/;
+const REGEXP_SPECIAL_RE = /[.*+?^${}()|[\]\\]/g;
 const SCRIPT_RE = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
 const REGEX_CACHE = new Map<string, RegExp>();
 
@@ -64,7 +69,7 @@ export type Anchor = { href: string; content: string };
 const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
 
 function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return value.replace(REGEXP_SPECIAL_RE, "\\$&");
 }
 
 function cachedRegex(source: string, flags: string): RegExp {
@@ -102,11 +107,11 @@ function openTagPattern(className: string, tag: string): string {
 }
 
 function isVoidMatch(tagName: string, openTag: string): boolean {
-    return VOID_TAGS.has(tagName.toLowerCase()) || /\/>\s*$/.test(openTag);
+    return VOID_TAGS.has(tagName.toLowerCase()) || SELF_CLOSING_RE.test(openTag);
 }
 
 function classTokens(openTag: string): string[] {
-    return (getTagAttr(openTag, "class") ?? "").split(/\s+/).filter(Boolean);
+    return (getTagAttr(openTag, "class") ?? "").split(WHITESPACE_RE).filter(Boolean);
 }
 
 function hasClassPrefix(openTag: string, prefix: string): boolean {
@@ -294,8 +299,8 @@ export function decodeEntities(text: string): string {
 }
 
 export function stripTags(html: string): string {
-    return decodeEntities(html.replace(SCRIPT_STYLE_RE, " ").replace(/<[^>]+>/g, " "))
-        .replace(/\s+/g, " ")
+    return decodeEntities(html.replace(SCRIPT_STYLE_RE, " ").replace(TAG_RE, " "))
+        .replace(WHITESPACE_RE, " ")
         .trim();
 }
 
@@ -312,7 +317,7 @@ export function isAbsoluteUrl(url: string): boolean {
 }
 
 export function trimLeadingSlashes(value: string): string {
-    return value.replace(/^\/+/, "");
+    return value.replace(LEADING_SLASHES_RE, "");
 }
 
 export function relativePath(url: string): string {

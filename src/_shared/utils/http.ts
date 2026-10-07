@@ -28,10 +28,19 @@ export function parseJson<T>(text: string): T | null {
     }
 }
 
-export async function fetchText(url: string, init?: RequestInit): Promise<string | null> {
+export async function fetchResponse(url: string, init?: RequestInit): Promise<Response | null> {
     try {
         const res = init ? await fetch(url, init) : await fetch(url);
-        return res.ok ? await res.text() : null;
+        return res.ok ? res : null;
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchText(url: string, init?: RequestInit): Promise<string | null> {
+    try {
+        const res = await fetchResponse(url, init);
+        return res ? await res.text() : null;
     } catch {
         return null;
     }
