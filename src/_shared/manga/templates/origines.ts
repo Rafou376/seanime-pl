@@ -1,5 +1,5 @@
 import { utcIso } from "../../utils/dates";
-import { absUrl, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix } from "../../utils/html";
+import { absUrl, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix, relativePath } from "../../utils/html";
 import { fetchForm, fetchText, parseJson } from "../../utils/http";
 import { matchChapterNumber, sortChapters } from "../provider-helpers";
 
@@ -16,7 +16,7 @@ type SearchResultItem = {
 
 const CHAPTER_DATE_RE = /(\d{1,2})\s+(\p{L}+)\.?(?:\s+(\d{4}))?/u;
 
-const ABSOLUTE_URL_RE = /^https?:\/\//i;
+const DIACRITICS_RE = /\p{M}/gu;
 
 const MONTHS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "ao", "sep", "oct", "nov", "dec"];
 
@@ -60,9 +60,7 @@ export abstract class Origines {
     }
 
     private pathSegments(path: string): string[] {
-        const cleanPath = ABSOLUTE_URL_RE.test(path) ? new URL(path).pathname : path;
-
-        return this.splitSegments(cleanPath).filter((segment) => segment !== this.mangaPath && !this.legacyMangaPaths.includes(segment));
+        return this.splitSegments(relativePath(path)).filter((segment) => segment !== this.mangaPath && !this.legacyMangaPaths.includes(segment));
     }
 
     private toMangaSlug(path: string): string {
@@ -132,7 +130,7 @@ export abstract class Origines {
     }
 
     private monthNumber(month: string): number | undefined {
-        const name = month.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+        const name = month.toLowerCase().normalize("NFD").replace(DIACRITICS_RE, "");
         const index = MONTHS.findIndex((prefix) => name.startsWith(prefix));
 
         return index === -1 ? undefined : index;
