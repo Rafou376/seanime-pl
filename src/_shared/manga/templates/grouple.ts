@@ -1,6 +1,7 @@
 import { utcIso } from "../../utils/dates";
 import { absUrl, getAttrByClass, getBlocksByClass, getLinkHrefByClass, getTextByClass, isAbsoluteUrl, scriptContaining, stripTags, trimLeadingSlashes } from "../../utils/html";
 import { fetchJson, fetchText } from "../../utils/http";
+import { memoizeAsync } from "../../utils/memo";
 import { sortChapters } from "../provider-helpers";
 
 type SearchResponse = {
@@ -32,7 +33,11 @@ export abstract class GroupLe {
     protected abstract readonly baseUrl: string;
 
     private userHash: string | null = null;
-    private userHashRequest: Promise<string | null> | null = null;
+    private readonly loadUserHash = memoizeAsync(async (slug: string) => {
+        const html = await this.fetchHtml(`${this.baseUrl}/${slug}`);
+
+        return html ? extractUserHash(html) : null;
+    });
 
     getSettings(): Settings {
         return { supportsMultiScanlator: true };
@@ -170,11 +175,7 @@ export abstract class GroupLe {
         const slug = pathname.split("/").filter(Boolean)[0];
         if (!slug) return Promise.resolve(null);
 
-        return (this.userHashRequest ??= this.fetchHtml(`${this.baseUrl}/${slug}`).then((html) => {
-            this.userHash = html ? extractUserHash(html) : null;
-            this.userHashRequest = null;
-            return this.userHash;
-        }));
+        return this.loadUserHash(slug);
     }
 
     private chapterSearchParams(html: string): string {
