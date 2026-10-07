@@ -134,10 +134,11 @@ export class Provider {
             if (IGNORED_SERVERS.has(name)) continue;
 
             const entries = Object.entries(versions);
+            const specificUrls = new Set(entries.filter(([version]) => version !== "default").map(([, url]) => url));
 
             for (const [version, url] of entries) {
                 if (!url) continue;
-                if (version === "default" && entries.some(([other, otherUrl]) => other !== "default" && otherUrl === url)) continue;
+                if (version === "default" && specificUrls.has(url)) continue;
 
                 (map[name] ??= []).push({ url, version: version === "default" ? "VO" : version });
             }
