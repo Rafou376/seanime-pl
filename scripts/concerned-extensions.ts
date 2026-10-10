@@ -3,6 +3,8 @@ import { basename, dirname, join } from "path";
 import { DOMAINS, Domain, UTILS_ROOT, declaredIds, findExtensionDirs, readRegistry } from "./domains";
 import { changedFiles as gitChangedFiles } from "./git";
 
+const REBUILD_ALL_FILES = ["bundle.ts", "scripts/domains.ts", "tsconfig.json", "tsconfig.base.json"];
+
 const base = process.argv[2];
 const changedFiles = base ? gitChangedFiles(base) : [];
 
@@ -40,7 +42,7 @@ function concernedForDomain(domain: Domain): string[] {
 }
 
 function concernedDirs(): string[] {
-    const rebuildAll = changedFiles.length === 0 || changedFiles.some((file) => file === "bundle.ts" || file === "scripts/domains.ts");
+    const rebuildAll = changedFiles.length === 0 || changedFiles.some((file) => REBUILD_ALL_FILES.includes(file));
 
     return rebuildAll ? DOMAINS.flatMap((domain) => findExtensionDirs(domain.root)) : DOMAINS.flatMap(concernedForDomain);
 }
