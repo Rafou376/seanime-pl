@@ -1,0 +1,11 @@
+{
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": "../node_modules/.cache/tsc/manga.tsbuildinfo"
+    },
+    "include": [
+        "manga/**/payload.ts",
+        "_shared/manga/**/*.ts",
+        "_shared/utils/**/*.ts"
+    ]
+}

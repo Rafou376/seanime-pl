@@ -10,6 +10,7 @@ on:
       - "scripts/**"
       - "bundle.ts"
       - "tsconfig*.json"
+      - "src/tsconfig*.json"
       - ".github/workflows/build.yml"
       - ".github/actions/**"
   pull_request:
@@ -20,6 +21,7 @@ on:
       - "scripts/**"
       - "bundle.ts"
       - "tsconfig*.json"
+      - "src/tsconfig*.json"
       - ".github/workflows/build.yml"
       - ".github/actions/**"
       - "package.json"

@@ -9,7 +9,7 @@
         "scripts/**/*.ts"
     ],
     "references": [
-        { "path": "./tsconfig.onlinestream.json" },
-        { "path": "./tsconfig.manga.json" }
+        { "path": "./src/tsconfig.onlinestream.json" },
+        { "path": "./src/tsconfig.manga.json" }
     ]
 }
