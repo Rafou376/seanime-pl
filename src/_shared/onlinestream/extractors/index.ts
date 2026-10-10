@@ -1,4 +1,5 @@
 import { EXTRACTORS } from "virtual:extractors-map";
+import { fetchResponse } from "../../utils/http";
 import { noSources } from "../provider-helpers";
 
 const EXTRACTOR_KEYS = Object.keys(EXTRACTORS).sort((a, b) => b.length - a.length);
@@ -22,12 +23,7 @@ export function hasExtractor(serverName: string): boolean {
 }
 
 async function probe(url: string, init: RequestInit): Promise<boolean> {
-    try {
-        const res = await fetch(url, init);
-        return res.ok;
-    } catch {
-        return false;
-    }
+    return (await fetchResponse(url, init)) !== null;
 }
 
 async function isReachable(url: string, headers: Record<string, string>): Promise<boolean> {
