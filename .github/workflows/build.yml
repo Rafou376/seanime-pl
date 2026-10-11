@@ -6,6 +6,7 @@ on:
     paths:
       - "src/onlinestream/**/payload.ts"
       - "src/manga/**/payload.ts"
+      - "src/**/manifest.json"
       - "src/_shared/**"
       - "scripts/**"
       - "bundle.ts"
@@ -17,6 +18,7 @@ on:
     paths:
       - "src/onlinestream/**/payload.ts"
       - "src/manga/**/payload.ts"
+      - "src/**/manifest.json"
       - "src/_shared/**"
       - "scripts/**"
       - "bundle.ts"

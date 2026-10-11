@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
-import { basename, dirname, join } from "path";
+import { basename, dirname, join, posix } from "path";
 import { DOMAINS, Domain, UTILS_ROOT, declaredIds, findExtensionDirs, readRegistry } from "./domains";
-import { changedFiles as gitChangedFiles } from "./git";
+import { changedFiles as gitChangedFiles, showAt } from "./git";
 
 const REBUILD_ALL_FILES = ["bundle.ts", "scripts/domains.ts", "tsconfig.json", "tsconfig.base.json"];
 
@@ -13,6 +13,13 @@ function isSharedChange(file: string, domain: Domain): boolean {
     if (!file.startsWith(`${domain.sharedRoot}/`)) return false;
 
     return !file.startsWith(`${domain.itemsDir}/`) || basename(file) === "index.ts";
+}
+
+function websiteChanged(dir: string): boolean {
+    const manifestPath = posix.join(dir, "manifest.json");
+    const oldWebsite = JSON.parse(showAt(base!, manifestPath) ?? "{}").website;
+    const newWebsite = JSON.parse(readFileSync(manifestPath, "utf-8")).website;
+    return oldWebsite !== newWebsite;
 }
 
 function concernedForDomain(domain: Domain): string[] {
@@ -27,6 +34,7 @@ function concernedForDomain(domain: Domain): string[] {
 
     const directlyChangedDirs = changedFiles
         .filter((file) => ["payload.ts", "manifest.json"].includes(basename(file)))
+        .filter((file) => basename(file) === "payload.ts" || websiteChanged(dirname(file)))
         .map((file) => dirname(file))
         .filter((dir) => dirs.includes(dir));
 
