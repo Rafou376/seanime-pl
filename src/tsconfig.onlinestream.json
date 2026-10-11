@@ -6,6 +6,7 @@
     "include": [
         "onlinestream/**/payload.ts",
         "_shared/onlinestream/**/*.ts",
+        "_shared/types.d.ts",
         "_shared/utils/**/*.ts"
     ]
 }

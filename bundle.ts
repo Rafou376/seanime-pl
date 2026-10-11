@@ -3,36 +3,43 @@ import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { DOMAINS, Domain, domainForDir, findExtensionDirs, readRegistry } from "./scripts/domains";
 
-function virtualExtractorsMapPlugin(domain: Domain, allowed: string[]): esbuild.Plugin {
+type VirtualModule = { contents: string; resolveDir?: string };
+
+function virtualModulesPlugin(modules: Record<string, VirtualModule>): esbuild.Plugin {
+    return {
+        name: "virtual-modules",
+        setup(build) {
+            build.onResolve({ filter: /^virtual:/ }, (args) =>
+                args.path in modules ? { path: args.path, namespace: "virtual" } : undefined,
+            );
+            build.onLoad({ filter: /.*/, namespace: "virtual" }, (args) => ({
+                contents: modules[args.path]!.contents,
+                loader: "ts",
+                resolveDir: modules[args.path]!.resolveDir,
+            }));
+        },
+    };
+}
+
+function extractorsMapModule(domain: Domain, allowed: string[]): VirtualModule {
     const registry = readRegistry(domain);
 
     for (const id of allowed) {
         if (!registry[id]?.file || !registry[id]?.export) throw new Error(`Unknown extractor "${id}" in ${domain.registryPath}`);
     }
 
-    return {
-        name: "virtual-extractors-map",
-        setup(build) {
-            build.onResolve({ filter: /^virtual:extractors-map$/ }, (args) => ({
-                path: args.path,
-                namespace: "virtual-extractors-map",
-            }));
-            build.onLoad({ filter: /.*/, namespace: "virtual-extractors-map" }, () => {
-                const contents = [
-                    ...allowed.map((id) => `import { ${registry[id]!.export} } from "./${registry[id]!.file}";`),
-                    `export const EXTRACTORS = {`,
-                    ...allowed.map((id) => `    ${id}: ${registry[id]!.export},`),
-                    `};`,
-                ].join("\n");
+    const contents = [
+        ...allowed.map((id) => `import { ${registry[id]!.export} } from "./${registry[id]!.file}";`),
+        `export const EXTRACTORS = {`,
+        ...allowed.map((id) => `    ${id}: ${registry[id]!.export},`),
+        `};`,
+    ].join("\n");
 
-                return { contents, loader: "ts", resolveDir: domain.itemsDir };
-            });
-        },
-    };
+    return { contents, resolveDir: domain.itemsDir };
 }
 
 function stripPathComments(code: string): string {
-    return code.replace(/^\/\/ .+\.tsx?\n/gm, "");
+    return code.replace(/^\/\/ (?:.+\.tsx?|virtual:.+)\n/gm, "");
 }
 
 function stripExports(code: string): string {
@@ -46,9 +53,11 @@ async function buildExtension(dir: string) {
     const manifestPath = join(dir, "manifest.json");
     const raw = readFileSync(manifestPath, "utf-8");
     const manifest = JSON.parse(raw);
-    const allowed: string[] = manifest.extractors ?? [];
 
-    const plugins = manifest.extractors ? [virtualExtractorsMapPlugin(domain, allowed)] : [];
+    const modules: Record<string, VirtualModule> = {
+        "virtual:website": { contents: `export const WEBSITE = ${JSON.stringify(manifest.website)};` },
+    };
+    if (manifest.extractors) modules["virtual:extractors-map"] = extractorsMapModule(domain, manifest.extractors);
 
     const result = await esbuild.build({
         entryPoints: [join(dir, "payload.ts")],
@@ -57,7 +66,7 @@ async function buildExtension(dir: string) {
         target: "es2020",
         platform: "neutral",
         charset: "utf8",
-        plugins,
+        plugins: [virtualModulesPlugin(modules)],
     });
 
     const referenceHeader = `/// <reference path="${domain.declaration}" />\n`;

@@ -1,3 +1,4 @@
+import { WEBSITE } from "virtual:website";
 import { utcIso } from "../../utils/dates";
 import { absUrl, type Anchor, getAnchors, getBlockByClass, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
 import { cookieHeader, fetchResponse, parseSetCookie } from "../../utils/http";
@@ -44,8 +45,6 @@ function matchesUnit(words: string[], word: string): boolean {
 }
 
 export abstract class FMReader implements MangaProvider {
-    protected abstract readonly baseUrl: string;
-
     protected readonly requestPath: string = "manga-list.html";
     protected readonly cookies: Record<string, string> = {};
 
@@ -97,11 +96,11 @@ export abstract class FMReader implements MangaProvider {
     }
 
     protected searchUrl(query: string): string {
-        return `${this.baseUrl}/${this.requestPath}?name=${encodeURIComponent(query)}&page=1&author=&group=&m_status=&sort=views&genre=&ungenre=`;
+        return `${WEBSITE}/${this.requestPath}?name=${encodeURIComponent(query)}&page=1&author=&group=&m_status=&sort=views&genre=&ungenre=`;
     }
 
     protected chapterListUrl(id: string): string {
-        return `${this.baseUrl}/${id}`;
+        return `${WEBSITE}/${id}`;
     }
 
     protected chapterLinkBase(listUrl: string): string {
@@ -133,7 +132,7 @@ export abstract class FMReader implements MangaProvider {
     }
 
     private absolute(path: string): string {
-        return absUrl(path, `${this.baseUrl}/`);
+        return absUrl(path, `${WEBSITE}/`);
     }
 
     private buildHeaders(extra: Record<string, string> = {}, sessionCookies: Record<string, string> = {}): Record<string, string> {

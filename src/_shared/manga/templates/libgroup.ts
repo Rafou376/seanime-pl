@@ -1,3 +1,4 @@
+import { WEBSITE } from "virtual:website";
 import { fetchJson } from "../../utils/http";
 import { memoizeAsync } from "../../utils/memo";
 import { sortChapters } from "../provider-helpers";
@@ -50,7 +51,6 @@ type ConstantsResponse = {
 
 export abstract class LibGroup implements MangaProvider {
     protected abstract readonly siteId: number;
-    protected abstract readonly baseUrl: string;
     protected abstract readonly apiUrl: string;
 
     protected readonly imgApiUrl: string = "https://api.cdnlibs.org";
@@ -104,7 +104,7 @@ export abstract class LibGroup implements MangaProvider {
             .map((page, index) => ({
                 url: `${server}${page.url}`,
                 index,
-                headers: { Referer: this.baseUrl },
+                headers: { Referer: WEBSITE },
             }));
     }
 
@@ -120,7 +120,7 @@ export abstract class LibGroup implements MangaProvider {
 
         return {
             id,
-            url: `${this.baseUrl}/ru/${slug}/read/v${chapter.volume}/c${chapter.number}`,
+            url: `${WEBSITE}/ru/${slug}/read/v${chapter.volume}/c${chapter.number}`,
             title,
             chapter: chapter.number,
             scanlator: branch?.teams[0]?.name ?? branch?.user.username,
@@ -140,7 +140,7 @@ export abstract class LibGroup implements MangaProvider {
         return fetchJson<T>(url, {
             headers: {
                 Accept: "application/json",
-                Referer: this.baseUrl,
+                Referer: WEBSITE,
                 "Site-Id": String(this.siteId),
             },
         });

@@ -1,3 +1,4 @@
+import { WEBSITE } from "virtual:website";
 import { utcIso } from "../../utils/dates";
 import { absUrl, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix, relativePath } from "../../utils/html";
 import { fetchForm, fetchText, parseJson } from "../../utils/http";
@@ -21,7 +22,6 @@ const DIACRITICS_RE = /\p{M}/gu;
 const MONTHS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "ao", "sep", "oct", "nov", "dec"];
 
 export abstract class Origines implements MangaProvider {
-    protected abstract readonly baseUrl: string;
     protected abstract readonly mangaPath: string;
     protected readonly legacyMangaPaths: string[] = [];
 
@@ -30,7 +30,7 @@ export abstract class Origines implements MangaProvider {
     }
 
     async search(opts: QueryOptions): Promise<SearchResult[]> {
-        const text = await fetchForm(`${this.baseUrl}/wp-admin/admin-ajax.php`, { action: "madara_child_search", term: opts.query });
+        const text = await fetchForm(`${WEBSITE}/wp-admin/admin-ajax.php`, { action: "madara_child_search", term: opts.query });
         const data = text ? parseJson<SearchResponse>(text)?.data : undefined;
         const items = Array.isArray(data) ? data : [];
 
@@ -39,18 +39,18 @@ export abstract class Origines implements MangaProvider {
             .map((item) => ({
                 id: this.toMangaSlug(item.url),
                 title: item.title,
-                image: item.thumb ? absUrl(item.thumb, this.baseUrl) : undefined,
+                image: item.thumb ? absUrl(item.thumb, WEBSITE) : undefined,
             }));
     }
 
     async findChapters(id: string): Promise<ChapterDetails[]> {
-        const html = await fetchText(`${this.baseUrl}/${this.mangaPath}/${id}/`);
+        const html = await fetchText(`${WEBSITE}/${this.mangaPath}/${id}/`);
 
         return html ? this.parseChapters(html, id) : [];
     }
 
     async findChapterPages(id: string): Promise<ChapterPage[]> {
-        const html = await fetchText(`${this.baseUrl}/${this.mangaPath}/${id}/?style=list`);
+        const html = await fetchText(`${WEBSITE}/${this.mangaPath}/${id}/?style=list`);
 
         return html ? this.parsePages(html) : [];
     }
@@ -87,7 +87,7 @@ export abstract class Origines implements MangaProvider {
 
             chapters.push({
                 id,
-                url: absUrl(`${this.mangaPath}/${id}/`, this.baseUrl),
+                url: absUrl(`${this.mangaPath}/${id}/`, WEBSITE),
                 title: name,
                 chapter: matchChapterNumber(name) ?? name,
                 updatedAt: this.parseChapterDate(dateTitle),
@@ -98,13 +98,13 @@ export abstract class Origines implements MangaProvider {
     }
 
     private parsePages(chapterHtml: string): ChapterPage[] {
-        const referer = `${this.baseUrl}/${this.mangaPath}/`;
+        const referer = `${WEBSITE}/${this.mangaPath}/`;
 
         return getBlocksByClass(chapterHtml, "wp-manga-chapter-img", "img")
             .map((block) => getImageUrl(block)?.trim())
             .filter((url): url is string => !!url)
             .map((url, index) => ({
-                url: absUrl(url, this.baseUrl),
+                url: absUrl(url, WEBSITE),
                 index,
                 headers: { Referer: referer },
             }));

@@ -1,10 +1,9 @@
 /// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
+import { WEBSITE } from "virtual:website";
 import { extract, extractorNames, hasExtractor } from "../../_shared/onlinestream/extractors";
 import { emptyServer, episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
 import { decodeEntities } from "../../_shared/utils/html";
 import { fetchForm, fetchJson, parseJson } from "../../_shared/utils/http";
-
-const baseUrl = "https://french-stream.net";
 
 const IGNORED_SERVERS = new Set(["premium"]);
 const NON_VERSION_KEYS = new Set(["info"]);
@@ -52,13 +51,13 @@ export class Provider implements AnimeProvider {
     }
 
     async search(opts: SearchOptions): Promise<SearchResult[]> {
-        const html = await fetchForm(`${baseUrl}/engine/ajax/search.php`, { query: opts.query, page: "1" });
+        const html = await fetchForm(`${WEBSITE}/engine/ajax/search.php`, { query: opts.query, page: "1" });
         if (!html) return [];
 
         return [...html.matchAll(SEARCH_RE)].map(([, id = "", slug = "", title = ""]) => ({
             id,
             title: decodeEntities(title.trim()),
-            url: `${baseUrl}/${id}-${slug}.html`,
+            url: `${WEBSITE}/${id}-${slug}.html`,
             subOrDub: "both",
         }));
     }
@@ -101,7 +100,7 @@ export class Provider implements AnimeProvider {
     }
 
     private fetchEpisodesData(id: string): Promise<EpisodesData | null> {
-        const request: Promise<EpisodesData | null> = fetchJson<EpisodesData>(`${baseUrl}/ep-data.php?id=${id}`).then((json) => {
+        const request: Promise<EpisodesData | null> = fetchJson<EpisodesData>(`${WEBSITE}/ep-data.php?id=${id}`).then((json) => {
             if (!json && this.episodesCache.get(id) === request) this.episodesCache.delete(id);
             return json;
         });
@@ -127,7 +126,7 @@ export class Provider implements AnimeProvider {
     }
 
     private async getMovieServers(episodeInfo: MovieEpisodeId): Promise<ServersMap> {
-        const json = await fetchJson<FilmData>(`${baseUrl}/engine/ajax/film_api.php?id=${episodeInfo.id}`);
+        const json = await fetchJson<FilmData>(`${WEBSITE}/engine/ajax/film_api.php?id=${episodeInfo.id}`);
         const map: ServersMap = {};
 
         for (const [name, versions] of Object.entries(json?.players ?? {})) {

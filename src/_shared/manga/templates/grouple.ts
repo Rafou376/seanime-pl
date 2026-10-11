@@ -1,3 +1,4 @@
+import { WEBSITE } from "virtual:website";
 import { utcIso } from "../../utils/dates";
 import { absUrl, getAttrByClass, getBlocksByClass, getLinkHrefByClass, getTextByClass, isAbsoluteUrl, scriptContaining, stripTags, trimLeadingSlashes } from "../../utils/html";
 import { fetchJson, fetchText } from "../../utils/http";
@@ -30,11 +31,10 @@ function extractUserHash(html: string): string | null {
 
 export abstract class GroupLe implements MangaProvider {
     protected abstract readonly siteId: number;
-    protected abstract readonly baseUrl: string;
 
     private userHash: string | null = null;
     private readonly loadUserHash = memoizeAsync(async (slug: string) => {
-        const html = await this.fetchHtml(`${this.baseUrl}/${slug}`);
+        const html = await this.fetchHtml(`${WEBSITE}/${slug}`);
 
         return html ? extractUserHash(html) : null;
     });
@@ -44,7 +44,7 @@ export abstract class GroupLe implements MangaProvider {
     }
 
     async search(opts: QueryOptions): Promise<SearchResult[]> {
-        const url = new URL(`${this.baseUrl}/api/catalog/search`);
+        const url = new URL(`${WEBSITE}/api/catalog/search`);
 
         url.searchParams.set("offset", "0");
         url.searchParams.set("sortType", "RATING");
@@ -61,7 +61,7 @@ export abstract class GroupLe implements MangaProvider {
     }
 
     async findChapters(id: string): Promise<ChapterDetails[]> {
-        const html = await this.fetchHtml(`${this.baseUrl}/${trimLeadingSlashes(id)}`);
+        const html = await this.fetchHtml(`${WEBSITE}/${trimLeadingSlashes(id)}`);
         if (!html || html.includes("Запрещена публикация произведения по копирайту")) return [];
 
         const title = getTextByClass(html, "cr-hero-names__main") ?? "";
@@ -86,7 +86,7 @@ export abstract class GroupLe implements MangaProvider {
 
             chapters.push({
                 id: chapterId,
-                url: absUrl(chapterId, this.baseUrl),
+                url: absUrl(chapterId, WEBSITE),
                 title: name || `Глава ${chapterNumber}`,
                 chapter: chapterNumber,
                 scanlator,
@@ -126,7 +126,7 @@ export abstract class GroupLe implements MangaProvider {
 
             let imageUrl: string;
             if (middle.trim().length === 0 && end.startsWith("/static/")) {
-                imageUrl = this.baseUrl + end;
+                imageUrl = WEBSITE + end;
             } else if (middle.endsWith("/manga/")) {
                 imageUrl = host + end;
             } else {
@@ -158,7 +158,7 @@ export abstract class GroupLe implements MangaProvider {
             } catch {}
         }
 
-        const url = new URL(isAbsoluteUrl(value) ? value : `${this.baseUrl}/${trimLeadingSlashes(value)}`);
+        const url = new URL(isAbsoluteUrl(value) ? value : `${WEBSITE}/${trimLeadingSlashes(value)}`);
         url.searchParams.set("mtr", "true");
 
         if (!url.searchParams.get("d")) {
@@ -190,7 +190,7 @@ export abstract class GroupLe implements MangaProvider {
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "ru,en;q=0.9",
             "User-Agent": USER_AGENT,
-            Referer: `${this.baseUrl}/`,
+            Referer: `${WEBSITE}/`,
         };
     }
 

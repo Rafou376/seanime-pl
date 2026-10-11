@@ -1,11 +1,11 @@
 /// <reference path="../../_shared/manga/manga-provider.d.ts" />
+import { WEBSITE } from "virtual:website";
 import { FMReader } from "../../_shared/manga/templates/fmreader";
 
 const MANGA_SLUG_RE = /manga-(.+)/;
 const RAW_SLUG_RE = /raw-(.+)/;
 
 export class Provider extends FMReader {
-    protected readonly baseUrl = "https://nihonkuni.com";
     protected override readonly cookies = { smartlink_shown: "1" };
 
     protected override readonly mangaListClass = "manga-grid";
@@ -23,10 +23,10 @@ export class Provider extends FMReader {
     protected override chapterListUrl(id: string): string {
         const slug = (MANGA_SLUG_RE.exec(id)?.[1] ?? RAW_SLUG_RE.exec(id)?.[1] ?? id).split(".html")[0];
 
-        return `${this.baseUrl}/app/manga/controllers/cont.Listchapter.php?slug=${slug}`;
+        return `${WEBSITE}/app/manga/controllers/cont.Listchapter.php?slug=${slug}`;
     }
 
     protected override chapterLinkBase(): string {
-        return `${this.baseUrl}/`;
+        return `${WEBSITE}/`;
     }
 }

@@ -67,3 +67,7 @@ export function declaredIds(manifest: Record<string, unknown>, field: string): s
     if (Array.isArray(value)) return value.map(String);
     return value ? [String(value)] : [];
 }
+
+export function isValidWebsite(value: unknown): value is string {
+    return typeof value === "string" && /^https?:\/\/[^\s/]+$/.test(value);
+}

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs";
 import { basename, join } from "path";
 import { Script } from "vm";
-import { DOMAINS, declaredIds, findExtensionDirs, readRegistry } from "./domains";
+import { DOMAINS, declaredIds, findExtensionDirs, isValidWebsite, readRegistry } from "./domains";
 
 let failed = false;
 
@@ -53,6 +53,12 @@ for (const domain of DOMAINS) {
         }
         if (!/^\d+\.\d+\.\d+$/.test(text(manifest.version))) {
             fail(manifestPath, `has version "${text(manifest.version)}" which is not a valid MAJOR.MINOR.PATCH version`);
+        }
+
+        if (!isValidWebsite(manifest.website)) {
+            fail(manifestPath, `has website "${text(manifest.website)}" which is not a valid origin without trailing slash`);
+        } else if (!payload.includes(JSON.stringify(manifest.website))) {
+            fail(manifestPath, "contains a payload that does not embed its website");
         }
 
         for (const id of declaredIds(manifest, domain.manifestField)) {
