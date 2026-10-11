@@ -28,7 +28,7 @@ function extractUserHash(html: string): string | null {
     return USER_HASH_RE.exec(html)?.[1] ?? null;
 }
 
-export abstract class GroupLe {
+export abstract class GroupLe implements MangaProvider {
     protected abstract readonly siteId: number;
     protected abstract readonly baseUrl: string;
 

@@ -41,7 +41,7 @@ function episodeVersions(data: EpisodesData): [string, EpisodesData[string]][] {
     return Object.entries(data).filter(([key]) => !NON_VERSION_KEYS.has(key));
 }
 
-export class Provider {
+export class Provider implements AnimeProvider {
     private readonly episodesCache = new Map<string, Promise<EpisodesData | null>>();
 
     getSettings(): Settings {

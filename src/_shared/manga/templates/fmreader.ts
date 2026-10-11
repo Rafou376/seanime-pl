@@ -43,7 +43,7 @@ function matchesUnit(words: string[], word: string): boolean {
     return words.some((candidate) => (candidate.length > 2 ? word.startsWith(candidate) : word === candidate));
 }
 
-export abstract class FMReader {
+export abstract class FMReader implements MangaProvider {
     protected abstract readonly baseUrl: string;
 
     protected readonly requestPath: string = "manga-list.html";

@@ -20,7 +20,7 @@ const DIACRITICS_RE = /\p{M}/gu;
 
 const MONTHS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "ao", "sep", "oct", "nov", "dec"];
 
-export abstract class Origines {
+export abstract class Origines implements MangaProvider {
     protected abstract readonly baseUrl: string;
     protected abstract readonly mangaPath: string;
     protected readonly legacyMangaPaths: string[] = [];

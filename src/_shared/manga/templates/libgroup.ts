@@ -48,7 +48,7 @@ type ConstantsResponse = {
     data?: { imageServers?: ImageServer[] };
 };
 
-export abstract class LibGroup {
+export abstract class LibGroup implements MangaProvider {
     protected abstract readonly siteId: number;
     protected abstract readonly baseUrl: string;
     protected abstract readonly apiUrl: string;
