@@ -145,9 +145,13 @@ export abstract class FMReader implements MangaProvider {
         const res = await fetchResponse(url, { headers: this.buildHeaders(extra, sessionCookies) });
         if (!res) return null;
 
-        const html = await res.text().catch(() => null);
+        try {
+            const html = await res.text();
 
-        return html === null ? null : { html, cookies: { ...sessionCookies, ...parseSetCookie(res) } };
+            return { html, cookies: { ...sessionCookies, ...parseSetCookie(res) } };
+        } catch {
+            return null;
+        }
     }
 
     private async fetchHtml(url: string): Promise<string | null> {
