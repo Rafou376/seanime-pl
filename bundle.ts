@@ -42,6 +42,10 @@ function stripPathComments(code: string): string {
     return code.replace(/^\/\/ (?:.+\.tsx?|virtual:.+)\n/gm, "");
 }
 
+function stripPureAnnotations(code: string): string {
+    return code.replace(/\/\* @__PURE__ \*\/ ?/g, "");
+}
+
 function stripExports(code: string): string {
     return code
         .replace(/export\s*\{[^}]*\}\s*;?\s*/g, "")
@@ -69,8 +73,8 @@ async function buildExtension(dir: string) {
         plugins: [virtualModulesPlugin(modules)],
     });
 
-    const referenceHeader = `/// <reference path="${domain.declaration}" />\n`;
-    const bundledCode = referenceHeader + stripExports(stripPathComments(result.outputFiles[0]!.text));
+    const referenceHeader = `/// <reference path="${domain.declaration}" />\n\n`;
+    const bundledCode = referenceHeader + stripPureAnnotations(stripExports(stripPathComments(result.outputFiles[0]!.text)));
 
     manifest.payload = bundledCode;
 
