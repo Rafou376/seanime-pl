@@ -4,7 +4,7 @@
     "id": "nihonkuni",
     "name": "NihonKuni",
     "author": "Rafou376",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "template": "fmreader",
     "lang": "ja",
     "description": "NihonKuniは未加工の生スキャン（raw）を提供するプラットフォームです。",
