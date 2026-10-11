@@ -40,7 +40,7 @@ runs:
           echo "ref=" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Bump extension versions for changed extractors
+    - name: Bump extension versions
       shell: bash
       env:
         BASE: ${{ steps.base.outputs.ref }}

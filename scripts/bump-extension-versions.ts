@@ -32,8 +32,6 @@ for (const domain of DOMAINS) {
         );
     });
 
-    if (bumped.length === 0) continue;
-
     for (const dir of findExtensionDirs(domain.root)) {
         const manifestPath = posix.join(dir, "manifest.json");
         const oldManifest = JSON.parse(showAt(base, manifestPath) ?? "null");
@@ -41,8 +39,9 @@ for (const domain of DOMAINS) {
         if (!oldManifest) continue;
 
         const declared = new Set(declaredIds(newManifest, domain.manifestField));
-        const uses = bumped.some((id) => declared.has(id));
-        if (!uses || oldManifest.version !== newManifest.version) continue;
+        const usesBumped = bumped.some((id) => declared.has(id));
+        const websiteChanged = oldManifest.website !== undefined && oldManifest.website !== newManifest.website;
+        if (!(usesBumped || websiteChanged) || oldManifest.version !== newManifest.version) continue;
 
         newManifest.version = bumpPatch(newManifest.version);
         writeFileSync(manifestPath, JSON.stringify(newManifest, null, 4) + "\n");
