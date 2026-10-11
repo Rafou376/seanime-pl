@@ -1,14 +1,14 @@
 {
     "origines": {
-        "version": 3
+        "version": 4
     },
     "libgroup": {
-        "version": 3
+        "version": 4
     },
     "grouple": {
-        "version": 2
+        "version": 3
     },
     "fmreader": {
-        "version": 1
+        "version": 2
     }
 }
