@@ -102,6 +102,11 @@ function attrCapture(name: string): string {
     return `\\s${escapeRegExp(name)}\\s*=\\s*${ATTR_VALUE}`;
 }
 
+function getTagAttr(tag: string, name: string): string | null {
+    const match = cachedRegex(attrCapture(name), "i").exec(OPEN_TAG_RE.exec(tag)?.[0] ?? tag);
+    return match ? decodeEntities(match[1] ?? match[2] ?? "") : null;
+}
+
 function openTagPattern(className: string, tag: string): string {
     return `<(${tag})\\b[^>]*${attrPattern("class", className, "word")}[^>]*>`;
 }
@@ -322,11 +327,6 @@ export function trimLeadingSlashes(value: string): string {
 
 export function relativePath(url: string): string {
     return trimLeadingSlashes(url.replace(ORIGIN_RE, "").split("#")[0] ?? "");
-}
-
-function getTagAttr(tag: string, name: string): string | null {
-    const match = cachedRegex(attrCapture(name), "i").exec(OPEN_TAG_RE.exec(tag)?.[0] ?? tag);
-    return match ? decodeEntities(match[1] ?? match[2] ?? "") : null;
 }
 
 export function getAnchors(html: string): Anchor[] {
