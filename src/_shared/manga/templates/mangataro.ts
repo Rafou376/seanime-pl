@@ -1,4 +1,5 @@
 import { WEBSITE } from "virtual:website";
+import { relativeDateIso } from "../../utils/dates";
 import { absUrl, decodeEntities } from "../../utils/html";
 import { fetchJson, parseJson } from "../../utils/http";
 import { md5 } from "../../utils/md5";
@@ -44,6 +45,7 @@ const SEARCH_LIMIT = 25;
 const CHAPTERS_LIMIT = 500;
 const PLACEHOLDERS = new Set(["N/A", "\u2014"]);
 const RELATIVE_DATE_RE = /^(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago$/i;
+const TRAILING_SLASHES_RE = /\/+$/;
 const CHAPTER_ID_RE = /([^/-]+)$/;
 
 function unescapeHtml(text: string): string {
@@ -66,42 +68,14 @@ function cleanText(value?: string | null): string | undefined {
 
 function parseRelativeDate(text?: string | null): string | undefined {
     const match = RELATIVE_DATE_RE.exec(text?.trim() ?? "");
-    if (!match) return undefined;
 
-    const amount = parseInt(match[1] ?? "0", 10);
-    const date = new Date();
-
-    switch ((match[2] ?? "").toLowerCase()) {
-        case "second":
-            date.setSeconds(date.getSeconds() - amount);
-            break;
-        case "minute":
-            date.setMinutes(date.getMinutes() - amount);
-            break;
-        case "hour":
-            date.setHours(date.getHours() - amount);
-            break;
-        case "day":
-            date.setDate(date.getDate() - amount);
-            break;
-        case "week":
-            date.setDate(date.getDate() - amount * 7);
-            break;
-        case "month":
-            date.setMonth(date.getMonth() - amount);
-            break;
-        case "year":
-            date.setFullYear(date.getFullYear() - amount);
-            break;
-    }
-
-    return date.toISOString();
+    return match ? relativeDateIso(parseInt(match[1] ?? "0", 10), match[2] ?? "") : undefined;
 }
 
 function chapterIdFromUrl(url: string): string | null {
     const clean = (url.split("#")[0] ?? "").split("?")[0] ?? "";
 
-    return CHAPTER_ID_RE.exec(clean.replace(/\/+$/, ""))?.[1] ?? null;
+    return CHAPTER_ID_RE.exec(clean.replace(TRAILING_SLASHES_RE, ""))?.[1] ?? null;
 }
 
 export abstract class MangaTaro implements MangaProvider {
@@ -167,7 +141,7 @@ export abstract class MangaTaro implements MangaProvider {
     }
 
     private toChapterDetails(entry: ChapterEntry): Omit<ChapterDetails, "index"> | null {
-        const url = absUrl(entry.url.replace(/\/+$/, ""), WEBSITE);
+        const url = absUrl(entry.url.replace(TRAILING_SLASHES_RE, ""), WEBSITE);
         const id = chapterIdFromUrl(url);
         if (!id) return null;
 

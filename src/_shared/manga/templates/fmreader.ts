@@ -1,13 +1,8 @@
 import { WEBSITE } from "virtual:website";
-import { utcIso } from "../../utils/dates";
+import { relativeDateIso, utcIso } from "../../utils/dates";
 import { absUrl, type Anchor, getAnchors, getBlockByClass, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
 import { cookieHeader, fetchResponse, parseSetCookie } from "../../utils/http";
 import { ANY_NUMBER_RE, matchChapterNumber, sortChapters } from "../provider-helpers";
-
-type RelativeUnit = {
-    words: string[];
-    subtract: (date: Date, value: number) => void;
-};
 
 type Page = {
     html: string;
@@ -22,27 +17,6 @@ const EXTENSION_RE = /\.[a-z]+$/i;
 const TRAILING_NUMBER_RE = /(\d+(?:\.\d+)?)(?=\D*$)/;
 
 const CHAPTER_NUMBER_RES = [/(?:\b(?:ch(?:apter)?|chap)\.?|第|#)\s*(\d+(?:\.\d+)?)/i, /(\d+(?:\.\d+)?)\s*[話话章]/, ANY_NUMBER_RE];
-
-function subtractMonths(date: Date, months: number): void {
-    const day = date.getUTCDate();
-
-    date.setUTCDate(1);
-    date.setUTCMonth(date.getUTCMonth() - months);
-    date.setUTCDate(Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()));
-}
-
-const RELATIVE_UNITS: RelativeUnit[] = [
-    { words: ["min", "phút", "minuto", "dakika"], subtract: (date, value) => date.setUTCMinutes(date.getUTCMinutes() - value) },
-    { words: ["hour", "giờ", "hora", "saat"], subtract: (date, value) => date.setUTCHours(date.getUTCHours() - value) },
-    { words: ["day", "ngày", "día", "gün"], subtract: (date, value) => date.setUTCDate(date.getUTCDate() - value) },
-    { words: ["week", "tuần", "semana", "hafta"], subtract: (date, value) => date.setUTCDate(date.getUTCDate() - value * 7) },
-    { words: ["month", "tháng", "mes", "ay"], subtract: (date, value) => subtractMonths(date, value) },
-    { words: ["year", "năm", "año", "yıl"], subtract: (date, value) => subtractMonths(date, value * 12) },
-];
-
-function matchesUnit(words: string[], word: string): boolean {
-    return words.some((candidate) => (candidate.length > 2 ? word.startsWith(candidate) : word === candidate));
-}
 
 export abstract class FMReader implements MangaProvider {
     protected readonly requestPath: string = "manga-list.html";
@@ -109,18 +83,10 @@ export abstract class FMReader implements MangaProvider {
 
     protected parseRelativeDate(text: string): string | undefined {
         const parts = text.trim().split(/\s+/);
-        const word = parts[this.dateWordIndex]?.toLowerCase();
+        const word = parts[this.dateWordIndex];
         const value = Number(parts[this.dateValueIndex]);
-        if (!word || !Number.isInteger(value)) return undefined;
 
-        const unit = RELATIVE_UNITS.find(({ words }) => matchesUnit(words, word));
-        if (!unit) return undefined;
-
-        const date = new Date();
-        date.setUTCSeconds(0, 0);
-        unit.subtract(date, value);
-
-        return date.toISOString();
+        return word && Number.isInteger(value) ? relativeDateIso(value, word) : undefined;
     }
 
     protected parseAbsoluteDate(text: string): string | undefined {
