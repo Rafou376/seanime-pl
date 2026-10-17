@@ -1,4 +1,5 @@
 import { getInputValue, getLinkHrefByClass } from "../../utils/html";
+import { fetchForm, fetchText } from "../../utils/http";
 import { noSources } from "../provider-helpers";
 import { wait } from "../../utils/timing";
 
@@ -23,49 +24,33 @@ function extractQualities(html: string): { url: string; resolution: string }[] {
 }
 
 async function resolveQuality(qualityUrl: string, resolution: string, label: string): Promise<VideoSource | null> {
-    try {
-        const videoId = qualityUrl.match(VIDEO_ID_RE)?.[1];
+    const videoId = qualityUrl.match(VIDEO_ID_RE)?.[1];
 
-        const res = await fetch(qualityUrl);
-        if (!res.ok) return null;
+    const html = await fetchText(qualityUrl);
+    if (!html) return null;
 
-        const html = await res.text();
+    const hash = getInputValue(html, "hash");
+    const op = getInputValue(html, "op") || "download_orig";
+    const id = getInputValue(html, "id") || videoId;
+    const mode = getInputValue(html, "mode") || "n";
 
-        const hash = getInputValue(html, "hash");
-        const op = getInputValue(html, "op") || "download_orig";
-        const id = getInputValue(html, "id") || videoId;
-        const mode = getInputValue(html, "mode") || "n";
+    if (!hash || !id) return null;
 
-        if (!hash || !id) return null;
+    wait(1000 + Math.random() * 500);
 
-        wait(1000 + Math.random() * 500);
+    const postHtml = await fetchForm(qualityUrl, { op, id, mode, hash });
+    if (!postHtml) return null;
 
-        const body = new URLSearchParams({ op, id, mode, hash });
+    const mp4Url = getLinkHrefByClass(postHtml, "download-btn");
+    if (!mp4Url) return null;
 
-        const postRes = await fetch(qualityUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: body.toString(),
-        });
-
-        if (!postRes.ok) return null;
-
-        const postHtml = await postRes.text();
-        const mp4Url = getLinkHrefByClass(postHtml, "download-btn");
-        if (!mp4Url) return null;
-
-        return {
-            url: mp4Url,
-            type: "mp4",
-            quality: `${resolution} - ${label}`,
-            label,
-            subtitles: [],
-        };
-    } catch {
-        return null;
-    }
+    return {
+        url: mp4Url,
+        type: "mp4",
+        quality: `${resolution} - ${label}`,
+        label,
+        subtitles: [],
+    };
 }
 
 export async function extractUqload(playerUrl: string, label: string): Promise<ExtractorResult> {
@@ -75,10 +60,9 @@ export async function extractUqload(playerUrl: string, label: string): Promise<E
 
         const origin = new URL(playerUrl).origin;
 
-        const res1 = await fetch(`${origin}/d/${videoId}`);
-        if (!res1.ok) return noSources();
+        const html1 = await fetchText(`${origin}/d/${videoId}`);
+        if (!html1) return noSources();
 
-        const html1 = await res1.text();
         const qualities = extractQualities(html1);
         if (!qualities.length) return noSources();
 
