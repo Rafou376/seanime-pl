@@ -3,7 +3,14 @@ import { basename, dirname, join, posix } from "path";
 import { DOMAINS, Domain, UTILS_ROOT, declaredIds, findExtensionDirs, readRegistry } from "./domains";
 import { changedFiles as gitChangedFiles, showAt } from "./git";
 
-const REBUILD_ALL_FILES = ["bundle.ts", "scripts/domains.ts", "tsconfig.json", "tsconfig.base.json"];
+const REBUILD_ALL_FILES = [
+    "bundle.ts",
+    "scripts/domains.ts",
+    "tsconfig.json",
+    "tsconfig.base.json",
+    "package.json",
+    "package-lock.json",
+];
 
 const base = process.argv[2];
 const changedFiles = base ? gitChangedFiles(base) : [];

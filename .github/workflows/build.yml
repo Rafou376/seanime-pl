@@ -14,6 +14,8 @@ on:
       - "src/tsconfig*.json"
       - ".github/workflows/build.yml"
       - ".github/actions/**"
+      - "package.json"
+      - "package-lock.json"
   pull_request:
     paths:
       - "src/onlinestream/**/payload.ts"
