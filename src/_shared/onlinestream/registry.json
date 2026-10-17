@@ -5,7 +5,7 @@
         "export": "extractVidzy"
     },
     "uqload": {
-        "version": 1,
+        "version": 2,
         "file": "uqload",
         "export": "extractUqload"
     }

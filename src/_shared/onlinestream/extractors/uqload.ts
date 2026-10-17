@@ -1,23 +1,23 @@
-import { getInputValue, getLinkHrefByClass } from "../../utils/html";
+import { absUrl, getAttrByClass, getBlocksByClass, getInputValue, getLinkHrefByClass, getTextByClass } from "../../utils/html";
 import { fetchForm, fetchText } from "../../utils/http";
 import { noSources } from "../provider-helpers";
 import { wait } from "../../utils/timing";
 
 const VIDEO_ID_RE = /(?:embed-|\/d\/)([a-zA-Z0-9_-]+)/;
+const DIMENSIONS_RE = /\d+\s*[×x]\s*\d+/;
 
-function extractQualities(html: string): { url: string; resolution: string }[] {
+function extractQualities(html: string, baseUrl: string): { url: string; resolution: string }[] {
     const qualities: { url: string; resolution: string }[] = [];
-    const table = html.match(/<table class="tbl1"[\s\S]*?<\/table>/)?.[0];
-    if (!table) return qualities;
 
-    const rows = table.split("<tr>").slice(1);
+    for (const row of getBlocksByClass(html, "pg-dlv__row", "a")) {
+        const href = getAttrByClass(row, "pg-dlv__row", "href", "a");
+        if (!href) continue;
 
-    for (const row of rows) {
-        const url = row.match(/href="([^"]+)"/)?.[1];
-        if (!url) continue;
+        const name = getTextByClass(row, "pg-dlv__q", "span");
+        const size = getTextByClass(row, "pg-dlv__meta", "span")?.match(DIMENSIONS_RE)?.[0];
+        const resolution = name && size ? `${name} (${size})` : name || size || "Auto";
 
-        const resolution = row.match(/<td>([^,<]+),/)?.[1]?.trim() || "Auto";
-        qualities.push({ url, resolution });
+        qualities.push({ url: absUrl(href, baseUrl), resolution });
     }
 
     return qualities;
@@ -63,7 +63,7 @@ export async function extractUqload(playerUrl: string, label: string): Promise<E
         const html1 = await fetchText(`${origin}/d/${videoId}`);
         if (!html1) return noSources();
 
-        const qualities = extractQualities(html1);
+        const qualities = extractQualities(html1, `${origin}/`);
         if (!qualities.length) return noSources();
 
         const sources = (await Promise.all(qualities.map((q) => resolveQuality(q.url, q.resolution, label))))
