@@ -99,6 +99,7 @@ export abstract class GroupLe implements MangaProvider {
 
     async findChapterPages(id: string): Promise<ChapterPage[]> {
         const url = await this.chapterUrl(id);
+        if (!url) return [];
 
         const html = await this.fetchHtml(url);
         if (!html) return [];
@@ -149,7 +150,7 @@ export abstract class GroupLe implements MangaProvider {
         return pages;
     }
 
-    private async chapterUrl(rawId: string): Promise<string> {
+    private async chapterUrl(rawId: string): Promise<string | null> {
         let value = rawId.trim();
 
         if (!value.includes("?") && value.includes("%3F")) {
@@ -158,7 +159,14 @@ export abstract class GroupLe implements MangaProvider {
             } catch {}
         }
 
-        const url = new URL(isAbsoluteUrl(value) ? value : `${WEBSITE}/${trimLeadingSlashes(value)}`);
+        let url: URL;
+
+        try {
+            url = new URL(isAbsoluteUrl(value) ? value : `${WEBSITE}/${trimLeadingSlashes(value)}`);
+        } catch {
+            return null;
+        }
+
         url.searchParams.set("mtr", "true");
 
         if (!url.searchParams.get("d")) {
@@ -207,7 +215,14 @@ export abstract class GroupLe implements MangaProvider {
     }
 
     private chapterId(href: string, searchParams: string): string {
-        const path = isAbsoluteUrl(href) ? new URL(href).pathname : href;
+        let path = href;
+
+        if (isAbsoluteUrl(href)) {
+            try {
+                path = new URL(href).pathname;
+            } catch {}
+        }
+
         return `${path}${searchParams}`;
     }
 
