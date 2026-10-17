@@ -52,7 +52,7 @@ export async function resolveEpisodeServer<T>(
     extract: ExtractFn<T>,
     isSupported: (serverName: string) => boolean = () => true,
 ): Promise<EpisodeServer> {
-    const availableServers = Object.keys(serversMap).sort();
+    const availableServers = Object.keys(serversMap);
     const picked = server === "default" ? undefined : pickServer(availableServers, server);
     const ordered = picked === undefined ? availableServers : [picked, ...availableServers.filter((name) => name !== picked)];
     const candidates = ordered.filter(isSupported);
