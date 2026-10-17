@@ -21,6 +21,10 @@ const DIACRITICS_RE = /\p{M}/gu;
 
 const MONTHS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "ao", "sep", "oct", "nov", "dec"];
 
+function pathSegments(path: string): string[] {
+    return (path.split(/[?#]/, 1)[0] ?? "").split("/").filter((segment) => segment.length > 0);
+}
+
 export abstract class Origines implements MangaProvider {
     protected abstract readonly mangaPath: string;
     protected readonly legacyMangaPaths: string[] = [];
@@ -55,20 +59,8 @@ export abstract class Origines implements MangaProvider {
         return html ? this.parsePages(html) : [];
     }
 
-    private splitSegments(path: string): string[] {
-        return (path.split(/[?#]/, 1)[0] ?? "").split("/").filter((segment) => segment.length > 0);
-    }
-
-    private pathSegments(path: string): string[] {
-        return this.splitSegments(relativePath(path)).filter((segment) => segment !== this.mangaPath && !this.legacyMangaPaths.includes(segment));
-    }
-
     private toMangaSlug(path: string): string {
-        return this.pathSegments(path)[0] ?? path;
-    }
-
-    private lastPathSegment(path: string): string | undefined {
-        return this.splitSegments(path).pop();
+        return pathSegments(relativePath(path)).find((segment) => segment !== this.mangaPath && !this.legacyMangaPaths.includes(segment)) ?? path;
     }
 
     private parseChapters(html: string, mangaId: string): ChapterDetails[] {
@@ -78,7 +70,7 @@ export abstract class Origines implements MangaProvider {
             const href = getLinkHrefByClass(block, "ori-chl-corps");
             if (!href) continue;
 
-            const chapterSlug = this.lastPathSegment(href);
+            const chapterSlug = pathSegments(href).pop();
             if (!chapterSlug) continue;
 
             const id = `${mangaId}/${chapterSlug}`;
@@ -117,7 +109,7 @@ export abstract class Origines implements MangaProvider {
         if (!match) return undefined;
 
         const [, day = "", monthLabel = "", year = ""] = match;
-        const month = this.monthNumber(monthLabel);
+        const month = this.monthIndex(monthLabel);
         if (month === undefined) return undefined;
 
         const dayNumber = parseInt(day, 10);
@@ -129,7 +121,7 @@ export abstract class Origines implements MangaProvider {
         return utcIso(resolvedYear, month, dayNumber);
     }
 
-    private monthNumber(month: string): number | undefined {
+    private monthIndex(month: string): number | undefined {
         const name = month.toLowerCase().normalize("NFD").replace(DIACRITICS_RE, "");
         const index = MONTHS.findIndex((prefix) => name.startsWith(prefix));
 
