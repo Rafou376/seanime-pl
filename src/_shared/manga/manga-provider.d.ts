@@ -1,11 +1,10 @@
-// https://seanime.gitbook.io/seanime-extensions/content-providers/manga-provider
-
 declare type SearchResult = {
     id: string
     title: string
     synonyms?: string[]
     year?: number
     image?: string
+    imageHeaders?: { [key: string]: string }
 }
 
 declare type ChapterDetails = {

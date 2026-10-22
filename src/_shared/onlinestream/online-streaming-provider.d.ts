@@ -1,5 +1,3 @@
-// https://seanime.gitbook.io/seanime-extensions/content-providers/online-streaming-provider
-
 declare type SearchResult = {
     id: string
     title: string
