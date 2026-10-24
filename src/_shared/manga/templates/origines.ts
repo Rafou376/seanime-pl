@@ -25,6 +25,13 @@ function pathSegments(path: string): string[] {
     return (path.split(/[?#]/, 1)[0] ?? "").split("/").filter((segment) => segment.length > 0);
 }
 
+function monthIndex(month: string): number | undefined {
+    const name = month.toLowerCase().normalize("NFD").replace(DIACRITICS_RE, "");
+    const index = MONTHS.findIndex((prefix) => name.startsWith(prefix));
+
+    return index === -1 ? undefined : index;
+}
+
 export abstract class Origines implements MangaProvider {
     protected abstract readonly mangaPath: string;
     protected readonly legacyMangaPaths: string[] = [];
@@ -109,7 +116,7 @@ export abstract class Origines implements MangaProvider {
         if (!match) return undefined;
 
         const [, day = "", monthLabel = "", year = ""] = match;
-        const month = this.monthIndex(monthLabel);
+        const month = monthIndex(monthLabel);
         if (month === undefined) return undefined;
 
         const dayNumber = parseInt(day, 10);
@@ -119,12 +126,5 @@ export abstract class Origines implements MangaProvider {
         if (!year && Date.UTC(resolvedYear, month, dayNumber) > now.getTime()) resolvedYear -= 1;
 
         return utcIso(resolvedYear, month, dayNumber);
-    }
-
-    private monthIndex(month: string): number | undefined {
-        const name = month.toLowerCase().normalize("NFD").replace(DIACRITICS_RE, "");
-        const index = MONTHS.findIndex((prefix) => name.startsWith(prefix));
-
-        return index === -1 ? undefined : index;
     }
 }
