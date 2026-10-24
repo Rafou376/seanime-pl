@@ -104,7 +104,7 @@ export abstract class LibGroup implements MangaProvider {
             .map((page, index) => ({
                 url: `${server}${page.url}`,
                 index,
-                headers: { Referer: WEBSITE },
+                headers: { Referer: `${WEBSITE}/` },
             }));
     }
 
@@ -140,7 +140,7 @@ export abstract class LibGroup implements MangaProvider {
         return fetchJson<T>(url, {
             headers: {
                 Accept: "application/json",
-                Referer: WEBSITE,
+                Referer: `${WEBSITE}/`,
                 "Site-Id": String(this.siteId),
             },
         });
