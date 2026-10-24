@@ -16,7 +16,7 @@ const ABSOLUTE_DATE_RE = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
 const EXTENSION_RE = /\.[a-z]+$/i;
 const TRAILING_NUMBER_RE = /(\d+(?:\.\d+)?)(?=\D*$)/;
 
-const CHAPTER_NUMBER_RES = [/(?:\b(?:ch(?:apter)?|chap)\.?|第|#)\s*(\d+(?:\.\d+)?)/i, /(\d+(?:\.\d+)?)\s*[話话章]/, ANY_NUMBER_RE];
+const CHAPTER_NUMBER_RES = [/(?:\bch(?:ap(?:ter)?)?\.?|第|#)\s*(\d+(?:\.\d+)?)/i, /(\d+(?:\.\d+)?)\s*[話话章]/, ANY_NUMBER_RE];
 
 export abstract class FMReader implements MangaProvider {
     protected readonly requestPath: string = "manga-list.html";
