@@ -32,7 +32,6 @@ runs:
         BEFORE_SHA: ${{ github.event.before }}
       run: |
         if [ "$EVENT_NAME" = "pull_request" ]; then
-          git fetch origin "$BASE_REF"
           echo "ref=$(git merge-base "origin/$BASE_REF" HEAD)" >> "$GITHUB_OUTPUT"
         elif git cat-file -e "$BEFORE_SHA" 2>/dev/null; then
           echo "ref=$BEFORE_SHA" >> "$GITHUB_OUTPUT"
