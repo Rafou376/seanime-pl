@@ -1,6 +1,5 @@
-import { readFileSync } from "fs";
-import { basename, dirname, join, posix } from "path";
-import { DOMAINS, Domain, UTILS_ROOT, declaredIds, findExtensionDirs, readRegistry } from "./domains";
+import { posix } from "path";
+import { DOMAINS, Domain, UTILS_ROOT, declaredIds, findExtensionDirs, manifestFile, readManifest, readRegistry } from "./domains";
 import { changedFiles as gitChangedFiles, showAt } from "./git";
 
 const REBUILD_ALL_FILES = [
@@ -19,13 +18,12 @@ function isSharedChange(file: string, domain: Domain): boolean {
     if (file.startsWith(`${UTILS_ROOT}/`)) return true;
     if (!file.startsWith(`${domain.sharedRoot}/`)) return false;
 
-    return !file.startsWith(`${domain.itemsDir}/`) || basename(file) === "index.ts";
+    return !file.startsWith(`${domain.itemsDir}/`) || posix.basename(file) === "index.ts";
 }
 
 function websiteChanged(dir: string): boolean {
-    const manifestPath = posix.join(dir, "manifest.json");
-    const oldWebsite = JSON.parse(showAt(base!, manifestPath) ?? "{}").website;
-    const newWebsite = JSON.parse(readFileSync(manifestPath, "utf-8")).website;
+    const oldWebsite = JSON.parse(showAt(base!, manifestFile(dir)) ?? "{}").website;
+    const newWebsite = readManifest(dir).website;
     return oldWebsite !== newWebsite;
 }
 
@@ -40,18 +38,15 @@ function concernedForDomain(domain: Domain): string[] {
         .map(([id]) => id);
 
     const directlyChangedDirs = changedFiles
-        .filter((file) => ["payload.ts", "manifest.json"].includes(basename(file)))
-        .filter((file) => basename(file) === "payload.ts" || websiteChanged(dirname(file)))
-        .map((file) => dirname(file))
-        .filter((dir) => dirs.includes(dir));
+        .filter((file) => dirs.includes(posix.dirname(file)))
+        .filter((file) => ["payload.ts", "manifest.json"].includes(posix.basename(file)))
+        .filter((file) => posix.basename(file) === "payload.ts" || websiteChanged(posix.dirname(file)))
+        .map((file) => posix.dirname(file));
 
     const dependentDirs =
         changedItems.length === 0
             ? []
-            : dirs.filter((dir) => {
-                  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
-                  return declaredIds(manifest, domain.manifestField).some((id) => changedItems.includes(id));
-              });
+            : dirs.filter((dir) => declaredIds(readManifest(dir), domain.manifestField).some((id) => changedItems.includes(id)));
 
     return [...directlyChangedDirs, ...dependentDirs];
 }

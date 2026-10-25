@@ -1,7 +1,6 @@
 import * as esbuild from "esbuild";
-import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import { DOMAINS, Domain, domainForDir, findExtensionDirs, readRegistry } from "./scripts/domains";
+import { DOMAINS, Domain, declaredIds, domainForDir, findExtensionDirs, readManifest, readRegistry, writeManifest } from "./scripts/domains";
 
 type VirtualModule = { contents: string; resolveDir?: string };
 
@@ -54,14 +53,13 @@ function stripExports(code: string): string {
 
 async function buildExtension(dir: string) {
     const domain = domainForDir(dir);
-    const manifestPath = join(dir, "manifest.json");
-    const raw = readFileSync(manifestPath, "utf-8");
-    const manifest = JSON.parse(raw);
+    const manifest = readManifest(dir);
 
     const modules: Record<string, VirtualModule> = {
         "virtual:website": { contents: `export const WEBSITE = ${JSON.stringify(manifest.website)};` },
     };
-    if (manifest.extractors) modules["virtual:extractors-map"] = extractorsMapModule(domain, manifest.extractors);
+    const extractors = declaredIds(manifest, "extractors");
+    if (extractors.length > 0) modules["virtual:extractors-map"] = extractorsMapModule(domain, extractors);
 
     const result = await esbuild.build({
         entryPoints: [join(dir, "payload.ts")],
@@ -78,8 +76,7 @@ async function buildExtension(dir: string) {
 
     manifest.payload = bundledCode;
 
-    const output = JSON.stringify(manifest, null, 4) + "\n";
-    if (output !== raw) writeFileSync(manifestPath, output);
+    writeManifest(dir, manifest);
 
     console.log(`✓ built ${dir}`);
 }

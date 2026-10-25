@@ -1,6 +1,4 @@
-import { readFileSync, writeFileSync } from "fs";
-import { posix } from "path";
-import { DOMAINS, Registry, declaredIds, findExtensionDirs, readRegistry } from "./domains";
+import { DOMAINS, Registry, declaredIds, findExtensionDirs, manifestFile, readManifest, readRegistry, writeManifest } from "./domains";
 import { showAt } from "./git";
 
 const base = process.argv[2];
@@ -33,9 +31,8 @@ for (const domain of DOMAINS) {
     });
 
     for (const dir of findExtensionDirs(domain.root)) {
-        const manifestPath = posix.join(dir, "manifest.json");
-        const oldManifest = JSON.parse(showAt(base, manifestPath) ?? "null");
-        const newManifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+        const oldManifest = JSON.parse(showAt(base, manifestFile(dir)) ?? "null");
+        const newManifest = readManifest(dir);
         if (!oldManifest) continue;
 
         const declared = new Set(declaredIds(newManifest, domain.manifestField));
@@ -43,8 +40,8 @@ for (const domain of DOMAINS) {
         const websiteChanged = oldManifest.website !== undefined && oldManifest.website !== newManifest.website;
         if (!(usesBumped || websiteChanged) || oldManifest.version !== newManifest.version) continue;
 
-        newManifest.version = bumpPatch(newManifest.version);
-        writeFileSync(manifestPath, JSON.stringify(newManifest, null, 4) + "\n");
+        newManifest.version = bumpPatch(String(newManifest.version));
+        writeManifest(dir, newManifest);
         console.log(`bumped ${newManifest.id} to ${newManifest.version}`);
     }
 }
