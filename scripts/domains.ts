@@ -12,7 +12,7 @@ export type Domain = {
 
 export type Manifest = Record<string, unknown>;
 
-export type Registry = Record<string, { version?: number; file?: string; export?: string }>;
+export type Registry = Record<string, { version?: number; file?: string; export?: string; aliases?: string[] }>;
 
 export const UTILS_ROOT = "src/_shared/utils";
 

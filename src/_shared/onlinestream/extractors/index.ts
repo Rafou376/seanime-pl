@@ -1,19 +1,22 @@
-import { EXTRACTORS } from "virtual:extractors-map";
+import { EXTRACTORS, EXTRACTOR_ALIASES } from "virtual:extractors-map";
 import { fetchResponse } from "../../utils/http";
 import { noSources } from "../provider-helpers";
 
-const EXTRACTOR_MAP = new Map(Object.entries(EXTRACTORS));
-const EXTRACTOR_KEYS = [...EXTRACTOR_MAP.keys()].sort((a, b) => b.length - a.length);
+const EXTRACTOR_BY_NAME = new Map<string, Extractor>([
+    ...Object.entries(EXTRACTORS),
+    ...Object.entries(EXTRACTOR_ALIASES).flatMap(([alias, id]): [string, Extractor][] => (EXTRACTORS[id] ? [[alias, EXTRACTORS[id]]] : [])),
+]);
+const EXTRACTOR_NAMES = [...EXTRACTOR_BY_NAME.keys()].sort((a, b) => b.length - a.length);
 
 export function extractorNames(): string[] {
-    return [...EXTRACTOR_MAP.keys()];
+    return Object.keys(EXTRACTORS);
 }
 
 function findExtractor(serverName: string): Extractor | undefined {
     const name = serverName.toLowerCase();
-    const key = EXTRACTOR_MAP.has(name) ? name : EXTRACTOR_KEYS.find((candidate) => name.includes(candidate));
+    const matched = EXTRACTOR_NAMES.find((candidate) => name.includes(candidate));
 
-    return key === undefined ? undefined : EXTRACTOR_MAP.get(key);
+    return matched === undefined ? undefined : EXTRACTOR_BY_NAME.get(matched);
 }
 
 export function hasExtractor(serverName: string): boolean {

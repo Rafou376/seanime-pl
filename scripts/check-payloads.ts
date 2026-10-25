@@ -16,6 +16,19 @@ function asString(value: unknown): string {
 
 for (const domain of DOMAINS) {
     const registry = readRegistry(domain);
+    const aliasOwners = new Map<string, string>();
+
+    for (const [id, entry] of Object.entries(registry)) {
+        for (const alias of entry.aliases ?? []) {
+            if (typeof alias !== "string" || alias === "" || alias !== alias.toLowerCase()) {
+                fail(domain.registryPath, `has entry "${id}" with invalid alias ${JSON.stringify(alias)}`);
+            } else if (registry[alias] || aliasOwners.has(alias)) {
+                fail(domain.registryPath, `has entry "${id}" with alias "${alias}" already used by "${registry[alias] ? alias : aliasOwners.get(alias)}"`);
+            } else {
+                aliasOwners.set(alias, id);
+            }
+        }
+    }
 
     for (const dir of findExtensionDirs(domain.root)) {
         const manifestPath = manifestFile(dir);

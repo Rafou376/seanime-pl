@@ -7,6 +7,7 @@ declare type Extractor = (playerUrl: string, label: string) => Promise<Extractor
 
 declare module "virtual:extractors-map" {
     export const EXTRACTORS: Record<string, Extractor>;
+    export const EXTRACTOR_ALIASES: Record<string, string>;
 }
 
 declare module "virtual:website" {
