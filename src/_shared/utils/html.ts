@@ -102,7 +102,7 @@ function attrCapture(name: string): string {
     return `\\s${escapeRegExp(name)}\\s*=\\s*${ATTR_VALUE}`;
 }
 
-function getTagAttr(tag: string, name: string): string | null {
+export function getTagAttr(tag: string, name: string): string | null {
     const match = cachedRegex(attrCapture(name), "i").exec(OPEN_TAG_RE.exec(tag)?.[0] ?? tag);
     return match ? decodeEntities(match[1] ?? match[2] ?? "") : null;
 }
