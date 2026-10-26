@@ -8,5 +8,10 @@
         "version": 2,
         "file": "uqload",
         "export": "extractUqload"
+    },
+    "vidmoly": {
+        "version": 1,
+        "file": "vidmoly",
+        "export": "extractVidmoly"
     }
 }
