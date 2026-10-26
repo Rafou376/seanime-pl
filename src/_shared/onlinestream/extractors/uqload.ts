@@ -1,5 +1,5 @@
 import { absUrl, getBlocksByClass, getLinkHrefByClass, getTagAttr, getTextByClass } from "../../utils/html";
-import { fetchForm, fetchText } from "../../utils/http";
+import { fetchForm, fetchText, originOf } from "../../utils/http";
 import { wait } from "../../utils/timing";
 import { parseDownloadForm } from "../../utils/xfs-download-form";
 import { noSources } from "../provider-helpers";
@@ -54,7 +54,8 @@ export async function extractUqload(playerUrl: string, label: string): Promise<E
     const videoId = playerUrl.match(VIDEO_ID_RE)?.[1];
     if (!videoId) return noSources();
 
-    const origin = new URL(playerUrl).origin;
+    const origin = originOf(playerUrl);
+    if (!origin) return noSources();
 
     const listingHtml = await fetchText(`${origin}/d/${videoId}`);
     if (!listingHtml) return noSources();

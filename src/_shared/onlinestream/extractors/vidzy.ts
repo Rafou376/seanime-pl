@@ -1,3 +1,4 @@
+import { originOf } from "../../utils/http";
 import { fetchDirectDownloadUrl } from "../../utils/xfs-download-form";
 import { noSources } from "../provider-helpers";
 
@@ -7,7 +8,9 @@ export async function extractVidzy(playerUrl: string, label: string): Promise<Ex
     const videoId = playerUrl.match(VIDEO_ID_RE)?.[1];
     if (!videoId) return noSources();
 
-    const origin = new URL(playerUrl).origin;
+    const origin = originOf(playerUrl);
+    if (!origin) return noSources();
+
     const rawUrl = await fetchDirectDownloadUrl(`${origin}/d/${videoId}_n`, videoId, "main-button");
     if (!rawUrl) return noSources();
 

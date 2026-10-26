@@ -1,16 +1,12 @@
 import { absUrl } from "../../utils/html";
-import { fetchText } from "../../utils/http";
+import { fetchText, originOf } from "../../utils/http";
 import { noSources } from "../provider-helpers";
 
 const M3U8_RE = /file\s*:\s*["']([^"']+?\.m3u8[^"']*)["']/;
 
 export async function extractVidmoly(playerUrl: string, label: string): Promise<ExtractorResult> {
-    let origin: string;
-    try {
-        origin = new URL(playerUrl).origin;
-    } catch {
-        return noSources();
-    }
+    const origin = originOf(playerUrl);
+    if (!origin) return noSources();
 
     const headers = { Referer: `${origin}/` };
     const html = await fetchText(playerUrl, { headers });

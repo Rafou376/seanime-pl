@@ -20,6 +20,14 @@ export function parseSetCookie(res: { headers: { get(name: string): string | nul
     return cookies;
 }
 
+export function originOf(url: string): string | null {
+    try {
+        return new URL(url).origin;
+    } catch {
+        return null;
+    }
+}
+
 export function parseJson<T>(text: string): T | null {
     try {
         return JSON.parse(text) as T;
