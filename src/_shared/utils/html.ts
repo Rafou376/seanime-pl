@@ -115,7 +115,7 @@ function isVoidMatch(tagName: string, openTag: string): boolean {
     return VOID_TAGS.has(tagName.toLowerCase()) || SELF_CLOSING_RE.test(openTag);
 }
 
-function classTokens(openTag: string): string[] {
+export function classTokens(openTag: string): string[] {
     return (getTagAttr(openTag, "class") ?? "").split(WHITESPACE_RE).filter(Boolean);
 }
 
@@ -303,8 +303,8 @@ export function decodeEntities(text: string): string {
     });
 }
 
-export function stripTags(html: string): string {
-    return decodeEntities(html.replace(SCRIPT_STYLE_RE, " ").replace(TAG_RE, " "))
+export function stripTags(html: string, joiner: string = " "): string {
+    return decodeEntities(html.replace(SCRIPT_STYLE_RE, " ").replace(TAG_RE, joiner))
         .replace(WHITESPACE_RE, " ")
         .trim();
 }
