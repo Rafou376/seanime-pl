@@ -18,6 +18,7 @@ const PANNEAU_CALL_RE = /^[ \t]*panneauAnime\(\s*(?:"([^"]*)"|'([^']*)')\s*,\s*(
 const MARK_TAIL_RE = /(\p{L})<\/mark>\s+(\p{Ll})/gu;
 const MARK_HEAD_RE = /(\p{L})\s+<mark>(\p{Ll})/gu;
 const BLOCK_COMMENT_RE = /\/\*[\s\S]*?\*\//g;
+const EPISODE_RANGE_RE = /\[\s*[EÉ]pisodes?\s+(\d+)\s+[àa]\s+\d+\s*\]/i;
 const LANGUES_RE = /languesDispo\s*=\s*(\[[^\]]*\])/;
 
 type EpisodeId = {
@@ -38,6 +39,7 @@ type LecteursInfos = Record<string, { nom?: string }>;
 type SeasonPath = {
     base: string;
     lang: string;
+    start: number;
 };
 
 function resolveUrl(path: string, base: string): string {
@@ -49,10 +51,18 @@ function resolveUrl(path: string, base: string): string {
 }
 
 function splitSeasonPath(path: string): SeasonPath | null {
-    const segments = trimLeadingSlashes(path).split("/").filter(Boolean);
+    const [rawPath = "", rawStart = ""] = path.split("#");
+    const segments = trimLeadingSlashes(rawPath).split("/").filter(Boolean);
     const lang = segments.pop();
+    const start = Number.parseInt(rawStart, 10);
 
-    return lang && segments.length > 0 ? { base: segments.join("/"), lang } : null;
+    return lang && segments.length > 0 ? { base: segments.join("/"), lang, start: start >= 1 ? start : 1 } : null;
+}
+
+function parseEpisodeStart(name: string | null): number {
+    const start = Number.parseInt(EPISODE_RANGE_RE.exec(name ?? "")?.[1] ?? "", 10);
+
+    return start >= 1 ? start : 1;
 }
 
 function pageUrl(base: string, lang: string): string {
@@ -133,7 +143,7 @@ export class Provider implements AnimeProvider {
         const count = Math.max(0, ...(lists ?? []).map((list) => list.length));
 
         return Array.from({ length: count }, (_, index) => {
-            const number = index + 1;
+            const number = season.start + index;
             const episodeId = JSON.stringify({ base: season.base, lang: season.lang, index } satisfies EpisodeId);
             return { id: episodeId, number, url: `${season.base}/${season.lang}`, title: `Episode ${number}` };
         });
@@ -161,25 +171,25 @@ export class Provider implements AnimeProvider {
             const href = getTagAttr(block, "href");
             if (!href || classTokens(block).includes("oe-panneau-scan")) return [];
 
-            return [{ href, name: getTextByClass(block, "oe-panneau-nom", "span") }];
+            return [{ href, name: getTextByClass(block, "oe-panneau-nom", "span"), start: 1 }];
         });
 
         const entries = panels.length > 0
             ? panels
-            : [...html.replace(BLOCK_COMMENT_RE, "").matchAll(PANNEAU_CALL_RE)].map((match) => ({
-                href: match[3] ?? match[4] ?? "",
-                name: decodeEntities(match[1] ?? match[2] ?? "").trim() || null,
-            }));
+            : [...html.replace(BLOCK_COMMENT_RE, "").matchAll(PANNEAU_CALL_RE)].map((match) => {
+                const name = decodeEntities(match[1] ?? match[2] ?? "").trim() || null;
+                return { href: match[3] ?? match[4] ?? "", name, start: parseEpisodeStart(name) };
+            });
 
-        return entries.flatMap(({ href, name }) => {
+        return entries.flatMap(({ href, name, start }) => {
             if (!href) return [];
 
             const url = resolveUrl(href, base);
-            const id = relativePath(url);
-            if (!splitSeasonPath(id)) return [];
+            const path = relativePath(url);
+            if (!splitSeasonPath(path)) return [];
 
             return [{
-                id,
+                id: start > 1 ? `${path}#${start}` : path,
                 title: name ? `${title}: ${name}` : title,
                 url,
                 subOrDub: "both" as const,
