@@ -1,10 +1,13 @@
 /// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
+
 import { WEBSITE } from "virtual:website";
 import { extract, extractorNames, hasExtractor } from "../../_shared/onlinestream/extractors";
 import { emptyServer, episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
 import { decodeEntities } from "../../_shared/utils/html";
 import { fetchForm, fetchJson, parseJson } from "../../_shared/utils/http";
+import { createTtlCache } from "../../_shared/utils/memo";
 
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const IGNORED_SERVERS = new Set(["premium"]);
 const NON_VERSION_KEYS = new Set(["info"]);
 
@@ -41,7 +44,7 @@ function episodeVersions(data: EpisodesData): [string, EpisodesData[string]][] {
 }
 
 export class Provider implements AnimeProvider {
-    private readonly episodesCache = new Map<string, Promise<EpisodesData | null>>();
+    private readonly cacheEpisodes = createTtlCache<EpisodesData>(CACHE_TTL_MS);
 
     getSettings(): Settings {
         return {
@@ -100,17 +103,11 @@ export class Provider implements AnimeProvider {
     }
 
     private fetchEpisodesData(id: string): Promise<EpisodesData | null> {
-        const request: Promise<EpisodesData | null> = fetchJson<EpisodesData>(`${WEBSITE}/ep-data.php?id=${id}`).then((json) => {
-            if (!json && this.episodesCache.get(id) === request) this.episodesCache.delete(id);
-            return json;
-        });
-
-        this.episodesCache.set(id, request);
-        return request;
+        return this.cacheEpisodes(id, () => fetchJson<EpisodesData>(`${WEBSITE}/ep-data.php?id=${id}`));
     }
 
     private async getTvServers(episodeInfo: TvEpisodeId): Promise<ServersMap> {
-        const json = (await (this.episodesCache.get(episodeInfo.id) ?? this.fetchEpisodesData(episodeInfo.id))) ?? {};
+        const json = (await this.fetchEpisodesData(episodeInfo.id)) ?? {};
         const map: ServersMap = {};
 
         for (const [version, episodes] of episodeVersions(json)) {
