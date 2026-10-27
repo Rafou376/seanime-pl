@@ -53,8 +53,11 @@ export async function resolveEpisodeServer<T>(
     isSupported: (serverName: string) => boolean = () => true,
 ): Promise<EpisodeServer> {
     const availableServers = Object.keys(serversMap);
-    const picked = server === "default" ? undefined : pickServer(availableServers, server);
-    const ordered = picked === undefined ? availableServers : [picked, ...availableServers.filter((name) => name !== picked)];
+    const isDefault = !server || server === "default";
+    const picked = isDefault ? undefined : pickServer(availableServers, server);
+    if (!isDefault && picked === undefined) return emptyServer(server);
+
+    const ordered = picked === undefined ? availableServers : [picked];
     const candidates = ordered.filter(isSupported);
 
     for (const name of candidates) {
