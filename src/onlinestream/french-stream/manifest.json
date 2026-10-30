@@ -10,7 +10,7 @@
         "uqload"
     ],
     "lang": "fr",
-    "description": "French Stream est une plateforme de streaming supportant séries et films",
+    "description": "French Stream est une plateforme française de streaming pour séries et films",
     "manifestURI": "https://raw.githubusercontent.com/rafou376/seanime-pl/main/src/onlinestream/french-stream/manifest.json",
     "icon": "https://raw.githubusercontent.com/rafou376/seanime-pl/main/src/onlinestream/french-stream/icon.ico",
     "website": "https://french-stream.net",
