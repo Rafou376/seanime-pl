@@ -180,7 +180,9 @@ function getAttr(
     const forward = cachedRegex(`<${tag}\\b[^>]*${matchPattern}[^>]*${targetPattern}`, "i");
     const backward = cachedRegex(`<${tag}\\b[^>]*${targetPattern}[^>]*${matchPattern}`, "i");
 
-    const found = forward.exec(html) ?? backward.exec(html);
+    const first = forward.exec(html);
+    const second = backward.exec(html);
+    const found = first && second ? (second.index < first.index ? second : first) : (first ?? second);
     return found ? decodeEntities(found[1] ?? found[2] ?? "") : null;
 }
 
