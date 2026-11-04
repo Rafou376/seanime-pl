@@ -1,6 +1,6 @@
-import { originOf } from "../../utils/http";
-import { fetchDirectDownloadUrl } from "../../utils/xfs-download-form";
+import { originOf } from "../../core/url";
 import { noSources } from "../provider-helpers";
+import { fetchDirectDownloadUrl } from "../xfs-download-form";
 
 const VIDEO_ID_RE = /(?:embed-|\/v\/\d+\/\d+\/)([a-zA-Z0-9]+)/;
 

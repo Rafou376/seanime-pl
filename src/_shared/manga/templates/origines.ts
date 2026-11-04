@@ -1,7 +1,9 @@
 import { WEBSITE } from "virtual:website";
-import { utcIso } from "../../utils/dates";
-import { absUrl, getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix, relativePath } from "../../utils/html";
-import { fetchForm, fetchText, parseJson } from "../../utils/http";
+import { utcIso } from "../../core/dates";
+import { getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix } from "../../core/html";
+import { fetchForm, fetchText } from "../../core/http";
+import { parseJson } from "../../core/json";
+import { absUrl, relativePath } from "../../core/url";
 import { matchChapterNumber, sortChapters } from "../provider-helpers";
 
 type SearchResponse = {

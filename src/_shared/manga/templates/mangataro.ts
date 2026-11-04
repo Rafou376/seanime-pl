@@ -1,8 +1,10 @@
 import { WEBSITE } from "virtual:website";
-import { relativeDateIso } from "../../utils/dates";
-import { absUrl, decodeEntities } from "../../utils/html";
-import { fetchJson, parseJson } from "../../utils/http";
-import { md5 } from "../../utils/md5";
+import { relativeDateIso } from "../../core/dates";
+import { md5 } from "../../core/hash/md5";
+import { decodeEntities } from "../../core/html";
+import { fetchJson } from "../../core/http";
+import { parseJson } from "../../core/json";
+import { absUrl } from "../../core/url";
 import { sortChapters } from "../provider-helpers";
 
 type SearchManga = {

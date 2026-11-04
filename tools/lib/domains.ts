@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { posix } from "path";
 
 export type Domain = {
@@ -10,11 +10,7 @@ export type Domain = {
     manifestField: string;
 };
 
-export type Manifest = Record<string, unknown>;
-
-export type Registry = Record<string, { version?: number; file?: string; export?: string; aliases?: string[] }>;
-
-export const UTILS_ROOT = "src/_shared/utils";
+export const CORE_ROOT = "src/_shared/core";
 
 function defineDomain(options: { name: string; itemsFolder: string; declaration: string; manifestField: string }): Domain {
     const sharedRoot = `src/_shared/${options.name}`;
@@ -58,30 +54,4 @@ export function domainForDir(dir: string): Domain {
     const domain = DOMAINS.find((d) => normalized.startsWith(`${d.root}/`));
     if (!domain) throw new Error(`No domain configured for ${dir}`);
     return domain;
-}
-
-export function readRegistry(domain: Domain): Registry {
-    return JSON.parse(readFileSync(domain.registryPath, "utf-8"));
-}
-
-export function manifestFile(dir: string): string {
-    return posix.join(dir, "manifest.json");
-}
-
-export function readManifest(dir: string): Manifest {
-    return JSON.parse(readFileSync(manifestFile(dir), "utf-8"));
-}
-
-export function writeManifest(dir: string, manifest: Manifest): void {
-    writeFileSync(manifestFile(dir), JSON.stringify(manifest, null, 4) + "\n");
-}
-
-export function declaredIds(manifest: Manifest, field: string): string[] {
-    const value = manifest[field];
-    if (Array.isArray(value)) return value.map(String);
-    return value ? [String(value)] : [];
-}
-
-export function isValidWebsite(value: unknown): value is string {
-    return typeof value === "string" && /^https?:\/\/[^\s/]+$/.test(value);
 }

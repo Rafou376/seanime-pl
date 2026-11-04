@@ -1,8 +1,9 @@
 import { WEBSITE } from "virtual:website";
-import { utcIso } from "../../utils/dates";
-import { absUrl, getAttrByClass, getBlocksByClass, getLinkHrefByClass, getTextByClass, isAbsoluteUrl, scriptContaining, stripTags, trimLeadingSlashes } from "../../utils/html";
-import { fetchJson, fetchText } from "../../utils/http";
-import { memoizeAsync } from "../../utils/memo";
+import { memoizeAsync } from "../../core/cache";
+import { utcIso } from "../../core/dates";
+import { getAttrByClass, getBlocksByClass, getLinkHrefByClass, getTextByClass, scriptContaining, stripTags } from "../../core/html";
+import { fetchJson, fetchText } from "../../core/http";
+import { absUrl, isAbsoluteUrl, trimLeadingSlashes } from "../../core/url";
 import { sortChapters } from "../provider-helpers";
 
 type SearchResponse = {

@@ -7,7 +7,7 @@
         "skipLibCheck": true,
         "composite": true,
         "emitDeclarationOnly": true,
-        "outDir": "node_modules/.cache/tsc",
+        "outDir": "../node_modules/.cache/tsc",
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "noImplicitOverride": true,

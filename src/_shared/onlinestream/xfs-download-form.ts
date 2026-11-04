@@ -1,5 +1,5 @@
-import { getInputValue, getLinkHrefByClass } from "./html";
-import { fetchForm, fetchText } from "./http";
+import { getInputValue, getLinkHrefByClass } from "../core/html";
+import { fetchForm, fetchText } from "../core/http";
 
 export function parseDownloadForm(html: string, fallbackId: string | undefined, extraFields: string[] = []): Record<string, string> | null {
     const hash = getInputValue(html, "hash");

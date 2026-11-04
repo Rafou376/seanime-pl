@@ -6,9 +6,9 @@
     },
     "scripts": {
         "typecheck": "tsc -b",
-        "build": "tsx bundle.ts",
-        "check": "tsx scripts/check-payloads.ts",
-        "bump": "tsx scripts/bump-extension-versions.ts"
+        "build": "tsx tools/build/index.ts",
+        "check": "tsx tools/ci/check-payloads.ts",
+        "bump": "tsx tools/ci/bump-versions.ts"
     },
     "devDependencies": {
         "@types/node": "^22.0.0",

@@ -1,5 +1,5 @@
 import { EXTRACTORS, EXTRACTOR_ALIASES } from "virtual:extractors-map";
-import { fetchResponse } from "../../utils/http";
+import { fetchResponse } from "../../core/http";
 import { noSources } from "../provider-helpers";
 
 const EXTRACTOR_BY_NAME = new Map<string, Extractor>([

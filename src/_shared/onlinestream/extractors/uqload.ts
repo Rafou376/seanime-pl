@@ -1,8 +1,10 @@
-import { absUrl, getBlocksByClass, getLinkHrefByClass, getTagAttr, getTextByClass } from "../../utils/html";
-import { fetchForm, fetchText, originOf } from "../../utils/http";
-import { wait } from "../../utils/timing";
-import { parseDownloadForm } from "../../utils/xfs-download-form";
+import { getBlocksByClass, getLinkHrefByClass, getTagAttr, getTextByClass } from "../../core/html";
+import { fetchForm, fetchText } from "../../core/http";
+import { wait } from "../../core/timing";
+import { absUrl } from "../../core/url";
+import { originOf } from "../../core/url";
 import { noSources } from "../provider-helpers";
+import { parseDownloadForm } from "../xfs-download-form";
 
 const VIDEO_ID_RE = /(?:embed-|\/d\/)([a-zA-Z0-9_-]+)/;
 const DIMENSIONS_RE = /\d+\s*[×x]\s*\d+/;

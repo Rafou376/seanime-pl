@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "..",
+        "tsBuildInfoFile": "../node_modules/.cache/tsc/onlinestream.tsbuildinfo"
+    },
+    "include": [
+        "../src/onlinestream/**/payload.ts",
+        "../src/_shared/onlinestream/**/*.ts",
+        "../src/_shared/core/**/*.ts"
+    ]
+}

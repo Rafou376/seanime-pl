@@ -1,6 +1,6 @@
 import { WEBSITE } from "virtual:website";
-import { fetchJson } from "../../utils/http";
-import { memoizeAsync } from "../../utils/memo";
+import { memoizeAsync } from "../../core/cache";
+import { fetchJson } from "../../core/http";
 import { sortChapters } from "../provider-helpers";
 
 type MangaShort = {

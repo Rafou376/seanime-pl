@@ -1,5 +1,7 @@
-import { DOMAINS, Registry, declaredIds, findExtensionDirs, manifestFile, readManifest, readRegistry, writeManifest } from "./domains";
-import { showAt } from "./git";
+import { DOMAINS, findExtensionDirs } from "../lib/domains";
+import { showAt } from "../lib/git";
+import { declaredIds, manifestFile, readManifest, writeManifest } from "../lib/manifest";
+import { Registry, readRegistry } from "../lib/registry";
 
 const base = process.argv[2];
 

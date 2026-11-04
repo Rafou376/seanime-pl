@@ -1,7 +1,9 @@
 import { existsSync } from "fs";
 import { basename, join } from "path";
 import { Script } from "vm";
-import { DOMAINS, declaredIds, findExtensionDirs, isValidWebsite, manifestFile, readManifest, readRegistry } from "./domains";
+import { DOMAINS, findExtensionDirs } from "../lib/domains";
+import { declaredIds, isValidWebsite, manifestFile, readManifest } from "../lib/manifest";
+import { readRegistry } from "../lib/registry";
 
 let failed = false;
 

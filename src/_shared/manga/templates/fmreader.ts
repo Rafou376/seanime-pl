@@ -1,7 +1,8 @@
 import { WEBSITE } from "virtual:website";
-import { relativeDateIso, utcIso } from "../../utils/dates";
-import { absUrl, type Anchor, getAnchors, getBlockByClass, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, relativePath, stripTags } from "../../utils/html";
-import { cookieHeader, fetchResponse, parseSetCookie } from "../../utils/http";
+import { relativeDateIso, utcIso } from "../../core/dates";
+import { getAnchors, getBlockByClass, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, stripTags, type Anchor } from "../../core/html";
+import { cookieHeader, fetchResponse, parseSetCookie } from "../../core/http";
+import { absUrl, relativePath } from "../../core/url";
 import { ANY_NUMBER_RE, matchChapterNumber, sortChapters } from "../provider-helpers";
 
 type Page = {

@@ -1,5 +1,6 @@
-import { absUrl } from "../../utils/html";
-import { fetchText, originOf } from "../../utils/http";
+import { fetchText } from "../../core/http";
+import { absUrl } from "../../core/url";
+import { originOf } from "../../core/url";
 import { noSources } from "../provider-helpers";
 
 const M3U8_RE = /file\s*:\s*["']([^"']+?\.m3u8[^"']*)["']/;

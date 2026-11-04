@@ -51,7 +51,7 @@ runs:
       env:
         BASE: ${{ steps.base.outputs.ref }}
       run: |
-        DIRS=$(npx tsx scripts/concerned-extensions.ts "$BASE")
+        DIRS=$(npx tsx tools/ci/concerned-extensions.ts "$BASE")
 
         DELIMITER="dirs_$(openssl rand -hex 8)"
         echo "dirs<<$DELIMITER" >> "$GITHUB_OUTPUT"

@@ -1,11 +1,13 @@
 /// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
 
 import { WEBSITE } from "virtual:website";
+import { createTtlCache } from "../../_shared/core/cache";
+import { classTokens, decodeEntities, getBlocksByClass, getTagAttr, getTextByClass, scriptContaining, stripTags } from "../../_shared/core/html";
+import { fetchForm, fetchText } from "../../_shared/core/http";
+import { parseJson } from "../../_shared/core/json";
+import { relativePath, trimLeadingSlashes } from "../../_shared/core/url";
 import { extract, extractorNames, hasExtractor } from "../../_shared/onlinestream/extractors";
 import { emptyServer, episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
-import { classTokens, decodeEntities, getBlocksByClass, getTagAttr, getTextByClass, relativePath, scriptContaining, stripTags, trimLeadingSlashes } from "../../_shared/utils/html";
-import { fetchForm, fetchText, parseJson } from "../../_shared/utils/http";
-import { createTtlCache } from "../../_shared/utils/memo";
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const ANIME_META_RE = /\banime\b/i;
