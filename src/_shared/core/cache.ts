@@ -1,13 +1,25 @@
-export function memoizeAsync<A extends unknown[], T>(load: (...args: A) => Promise<T | null>): (...args: A) => Promise<T | null> {
-    let pending: Promise<T | null> | null = null;
+export function memoizeAsync<A extends unknown[], T>(
+    load: (...args: A) => Promise<T | null>,
+    keyOf: (...args: A) => string = (...args) => JSON.stringify(args),
+): (...args: A) => Promise<T | null> {
+    const pending = new Map<string, Promise<T | null>>();
 
-    return (...args) =>
-        (pending ??= load(...args)
-            .catch(() => null)
-            .then((value) => {
-                if (value === null) pending = null;
-                return value;
-            }));
+    return (...args) => {
+        const key = keyOf(...args);
+        let hit = pending.get(key);
+
+        if (!hit) {
+            hit = load(...args)
+                .catch(() => null)
+                .then((value) => {
+                    if (value === null) pending.delete(key);
+                    return value;
+                });
+            pending.set(key, hit);
+        }
+
+        return hit;
+    };
 }
 
 type TtlEntry<T> = {
