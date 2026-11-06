@@ -27,13 +27,6 @@ type TvEpisodeId = {
 
 type EpisodeId = MovieEpisodeId | TvEpisodeId;
 
-type ServerEntry = {
-    url: string;
-    version: string;
-};
-
-type ServersMap = Record<string, ServerEntry[]>;
-
 type EpisodesData = Record<string, Record<string, Record<string, string | null>>>;
 
 type FilmData = {
@@ -100,7 +93,7 @@ export class Provider implements AnimeProvider {
             ? await this.getTvServers(episodeInfo)
             : await this.getMovieServers(episodeInfo);
 
-        return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.version.toUpperCase()), hasExtractor);
+        return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.label.toUpperCase()), hasExtractor);
     }
 
     private fetchEpisodesData(id: string): Promise<EpisodesData | null> {
@@ -116,7 +109,7 @@ export class Provider implements AnimeProvider {
 
             for (const [name, url] of Object.entries(servers)) {
                 if (IGNORED_SERVERS.has(name) || !url) continue;
-                (map[name] ??= []).push({ url, version });
+                (map[name] ??= []).push({ url, label: version });
             }
         }
 
@@ -137,7 +130,7 @@ export class Provider implements AnimeProvider {
                 if (!url) continue;
                 if (version === "default" && specificUrls.has(url)) continue;
 
-                (map[name] ??= []).push({ url, version: version === "default" ? "VO" : version });
+                (map[name] ??= []).push({ url, label: version === "default" ? "VO" : version });
             }
         }
 

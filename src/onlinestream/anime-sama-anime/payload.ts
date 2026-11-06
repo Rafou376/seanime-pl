@@ -29,13 +29,6 @@ type EpisodeId = {
     index: number;
 };
 
-type ServerEntry = {
-    url: string;
-    lang: string;
-};
-
-type ServersMap = Record<string, ServerEntry[]>;
-
 type LecteursInfos = Record<string, { nom?: string }>;
 
 type SeasonPath = {
@@ -157,7 +150,7 @@ export class Provider implements AnimeProvider {
 
         const serversMap = await this.getServers(episodeInfo);
 
-        return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.lang.toUpperCase()), hasExtractor);
+        return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.label.toUpperCase()), hasExtractor);
     }
 
     private fetchPage(url: string, referer?: string): Promise<string | null> {
@@ -241,7 +234,7 @@ export class Provider implements AnimeProvider {
         return (lists ?? []).flatMap((list) => {
             const url = list[episodeInfo.index];
             const name = url ? serverNameFor(url, lecteurs) : null;
-            return url && name ? [[name, { url, lang }] as [string, ServerEntry]] : [];
+            return url && name ? [[name, { url, label: lang }] as [string, ServerEntry]] : [];
         });
     }
 }
