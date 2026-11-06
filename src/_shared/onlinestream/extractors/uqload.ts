@@ -1,8 +1,7 @@
 import { getBlocksByClass, getLinkHrefByClass, getTagAttr, getTextByClass } from "../../core/html";
 import { fetchForm, fetchText } from "../../core/http";
 import { wait } from "../../core/timing";
-import { absUrl } from "../../core/url";
-import { originOf } from "../../core/url";
+import { absUrl, originOf } from "../../core/url";
 import { noSources } from "../provider-helpers";
 import { parseDownloadForm } from "../xfs-download-form";
 
