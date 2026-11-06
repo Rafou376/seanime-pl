@@ -1,1 +1,3 @@
+* text=auto eol=lf
+*.ico binary
 src/**/manifest.json linguist-generated
