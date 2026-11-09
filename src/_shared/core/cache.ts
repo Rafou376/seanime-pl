@@ -32,8 +32,14 @@ export function createTtlCache<T>(ttl: number): (key: string, load: () => Promis
 
     return (key, load) => {
         const now = Date.now();
+
+        for (const [cachedKey, cached] of entries) {
+            if (cached.expires > now) break;
+            entries.delete(cachedKey);
+        }
+
         const hit = entries.get(key);
-        if (hit && hit.expires > now) return hit.value;
+        if (hit) return hit.value;
 
         const entry: TtlEntry<T> = {
             expires: now + ttl,
