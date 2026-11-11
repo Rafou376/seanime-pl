@@ -117,11 +117,11 @@ def build_ico(source):
 
 def main():
     parser = argparse.ArgumentParser(description=f"Set the {ICON_NAME} of an extension from a PNG, JPEG, ICO or SVG image")
-    parser.add_argument("source", type=Path, help="source image")
-    parser.add_argument("extension", help="extension id or path of its directory")
-    parser.add_argument("--force", action="store_true", help=f"replace an existing {ICON_NAME}")
-    parser.add_argument("--background", type=parse_color, default="#ffffff", metavar="HEX", help="hex color replacing transparency (default: ffffff)")
-    parser.add_argument("--padding", type=parse_padding, default=0, metavar="PERCENT", help="margin on each side, in percent (default: 0)")
+    parser.add_argument("source", type=Path, help="source image path")
+    parser.add_argument("extension", help="extension id or directory path")
+    parser.add_argument("--force", action="store_true", help=f"overwrite an existing {ICON_NAME}")
+    parser.add_argument("--background", type=parse_color, default="#ffffff", metavar="HEX", help="color to replace transparency (6 hex digits, default: ffffff)")
+    parser.add_argument("--padding", type=parse_padding, default=0, metavar="PERCENT", help="margin percentage per side (0 to <50, default: 0)")
     args = parser.parse_args()
 
     try:
