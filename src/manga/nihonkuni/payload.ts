@@ -1,4 +1,3 @@
-/// <reference path="../../_shared/manga/manga-provider.d.ts" />
 import { WEBSITE } from "virtual:website";
 import { FMReader } from "../../_shared/manga/templates/fmreader";
 

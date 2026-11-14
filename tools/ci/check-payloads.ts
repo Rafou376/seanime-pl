@@ -55,8 +55,8 @@ for (const domain of DOMAINS) {
         if (/^\/\/ .+\.tsx?$/m.test(payload)) {
             fail(manifestPath, "contains a payload with file-path comments");
         }
-        if (!payload.startsWith(`/// <reference path="${domain.declaration}" />\n`)) {
-            fail(manifestPath, "contains a payload without the expected reference header");
+        if (manifest.language !== "javascript") {
+            fail(manifestPath, `has language "${asString(manifest.language)}" instead of "javascript"`);
         }
         if (!/^(?:class\s+Provider\b|(?:var|let|const)\s+Provider\s*=\s*class\b)/m.test(payload)) {
             fail(manifestPath, "contains a payload without a top-level class Provider");

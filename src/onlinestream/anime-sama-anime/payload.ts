@@ -1,5 +1,3 @@
-/// <reference path="../../_shared/onlinestream/online-streaming-provider.d.ts" />
-
 import { WEBSITE } from "virtual:website";
 import { createTtlCache } from "../../_shared/core/cache";
 import { decodeEntities, getText, joinPieces, normalizeText, scriptContaining } from "../../_shared/core/html";

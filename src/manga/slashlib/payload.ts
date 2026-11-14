@@ -1,4 +1,3 @@
-/// <reference path="../../_shared/manga/manga-provider.d.ts" />
 import { LibGroup } from "../../_shared/manga/templates/libgroup";
 
 export class Provider extends LibGroup {

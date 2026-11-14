@@ -4,7 +4,6 @@ import { posix } from "path";
 export type Domain = {
     root: string;
     sharedRoot: string;
-    declaration: string;
     itemsDir: string;
     registryPath: string;
     manifestField: string;
@@ -12,13 +11,12 @@ export type Domain = {
 
 export const CORE_ROOT = "src/_shared/core";
 
-function defineDomain(options: { name: string; itemsFolder: string; declaration: string; manifestField: string }): Domain {
+function defineDomain(options: { name: string; itemsFolder: string; manifestField: string }): Domain {
     const sharedRoot = `src/_shared/${options.name}`;
 
     return {
         root: `src/${options.name}`,
         sharedRoot,
-        declaration: options.declaration,
         itemsDir: `${sharedRoot}/${options.itemsFolder}`,
         registryPath: `${sharedRoot}/registry.json`,
         manifestField: options.manifestField,
@@ -29,13 +27,11 @@ export const DOMAINS: Domain[] = [
     defineDomain({
         name: "onlinestream",
         itemsFolder: "extractors",
-        declaration: "./online-streaming-provider.d.ts",
         manifestField: "extractors",
     }),
     defineDomain({
         name: "manga",
         itemsFolder: "templates",
-        declaration: "./manga-provider.d.ts",
         manifestField: "template",
     }),
 ];

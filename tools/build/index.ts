@@ -26,10 +26,8 @@ async function buildExtension(dir: string) {
         plugins: [virtualModulesPlugin(modules)],
     });
 
-    const referenceHeader = `/// <reference path="${domain.declaration}" />\n\n`;
-    const bundledCode = referenceHeader + postProcess(result.outputFiles[0]!.text);
-
-    manifest.payload = bundledCode;
+    manifest.language = "javascript";
+    manifest.payload = postProcess(result.outputFiles[0]!.text);
 
     writeManifest(dir, manifest);
 
