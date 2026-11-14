@@ -2,23 +2,25 @@
 
 import { WEBSITE } from "virtual:website";
 import { createTtlCache } from "../../_shared/core/cache";
-import { classTokens, decodeEntities, getBlocksByClass, getTagAttr, getTextByClass, scriptContaining, stripTags } from "../../_shared/core/html";
-import { fetchForm, fetchText } from "../../_shared/core/http";
+import { decodeEntities, getText, joinPieces, normalizeText, scriptContaining } from "../../_shared/core/html";
+import { fetchForm, fetchJson, fetchText } from "../../_shared/core/http";
 import { parseJson } from "../../_shared/core/json";
 import { relativePath, trimLeadingSlashes } from "../../_shared/core/url";
 import { extract, extractorNames, hasExtractor } from "../../_shared/onlinestream/extractors";
-import { emptyServer, episodeServerList, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
+import { emptyServer, episodeServerList, noSources, resolveEpisodeServer } from "../../_shared/onlinestream/provider-helpers";
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const ANIME_META_RE = /\banime\b/i;
-const EPISODES_SCRIPT_RE = /<script\b[^>]*\ssrc\s*=\s*(?:"([^"]*episodes\.js[^"]*)"|'([^']*episodes\.js[^']*)')/i;
 const JS_TOKEN_RE = /(["'])(?:\\.|(?!\1)[^\\\n])*\1|\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
 const EPS_ARRAY_RE = /(?:var|let|const)\s+eps\d+\s*=\s*\[((?:[^\]"']|"[^"]*"|'[^']*')*)\]/g;
 const QUOTED_RE = /(["'])(.*?)\1/g;
 const LECTEURS_RE = /lecteursInfos\s*=\s*(\{[\s\S]*?\})\s*;/;
+const EPS_DECL_RE = /(?:var|let|const)\s+eps\d+\s*=\s*\[/;
+const EPS_META_RE = /epsMeta\s*=\s*(\{[\s\S]*?\})\s*;/;
+const EPS_TOKEN_RE = /epsJeton\s*=\s*(["'])(.*?)\1/;
+const LINK_REF_RE = /^lien:(\d+)$/;
+const WWW_RE = /^www\./;
 const PANNEAU_CALL_RE = /^[ \t]*panneauAnime\(\s*(?:"([^"]*)"|'([^']*)')\s*,\s*(?:"([^"]*)"|'([^']*)')/gm;
-const MARK_TAIL_RE = /(\p{L})<\/mark>\s+(\p{Ll})/gu;
-const MARK_HEAD_RE = /(\p{L})\s+<mark>(\p{Ll})/gu;
 const BLOCK_COMMENT_RE = /\/\*[\s\S]*?\*\//g;
 const EPISODE_RANGE_RE = /\[\s*[EÉ]pisodes?\s+(\d+)\s+[àa]\s+\d+\s*\]/i;
 const LANGUES_RE = /languesDispo\s*=\s*(\[[^\]]*\])/;
@@ -31,11 +33,38 @@ type EpisodeId = {
 
 type LecteursInfos = Record<string, { nom?: string }>;
 
+type SeasonLinks = {
+    lists: string[][];
+    meta: Record<string, string[]>;
+    token: string;
+};
+
+type LinkEntry = {
+    id: string;
+    lang: string;
+};
+
 type SeasonPath = {
     base: string;
     lang: string;
     start: number;
 };
+
+function searchTitle(heading: DocSelection): string {
+    let title = "";
+    let markOnLeft = false;
+
+    heading.contents().each((_, node) => {
+        const text = node.text();
+        if (!text) return;
+
+        const isMark = node.is("mark");
+        title = isMark === markOnLeft ? title + text : joinPieces(title, text, markOnLeft);
+        markOnLeft = isMark;
+    });
+
+    return normalizeText(title);
+}
 
 function resolveUrl(path: string, base: string): string {
     if (/^https?:\/\//i.test(path)) return path;
@@ -64,13 +93,10 @@ function pageUrl(base: string, lang: string): string {
     return `${WEBSITE}/${base}/${lang}/`;
 }
 
-function serverNameFor(url: string, lecteurs: LecteursInfos): string | null {
-    try {
-        const host = new URL(url).hostname.toLowerCase();
-        return (lecteurs[host] ?? lecteurs[host.replace(/^www\./, "")])?.nom ?? host;
-    } catch {
-        return null;
-    }
+function serverNameFor(host: string, lecteurs: LecteursInfos): string {
+    const name = host.toLowerCase();
+
+    return (lecteurs[name] ?? lecteurs[name.replace(WWW_RE, "")])?.nom ?? name;
 }
 
 function parseAvailableLangs(html: string): string[] {
@@ -88,15 +114,21 @@ function parseLecteurs(html: string): LecteursInfos {
     return (raw ? parseJson<LecteursInfos>(raw) : null) ?? {};
 }
 
-function parseEpisodeLists(js: string): string[][] {
-    const source = js.replace(JS_TOKEN_RE, (token) => (token.startsWith("/") ? "" : token));
+function parseSeasonLinks(html: string): SeasonLinks | null {
+    const script = scriptContaining(html, EPS_DECL_RE);
+    const token = script ? EPS_TOKEN_RE.exec(script)?.[2] : undefined;
+    if (!script || !token) return null;
 
-    return [...source.matchAll(EPS_ARRAY_RE)].map(([, body = ""]) => [...body.matchAll(QUOTED_RE)].map((match) => match[2] ?? ""));
+    const source = script.replace(JS_TOKEN_RE, (match) => (match.startsWith("/") ? "" : match));
+    const lists = [...source.matchAll(EPS_ARRAY_RE)].map(([, body = ""]) => [...body.matchAll(QUOTED_RE)].map(([, , ref = ""]) => LINK_REF_RE.exec(ref)?.[1] ?? ""));
+    const meta = parseJson<Record<string, string[]>>(EPS_META_RE.exec(script)?.[1] ?? "") ?? {};
+
+    return { lists, meta, token };
 }
 
 export class Provider implements AnimeProvider {
     private readonly cachePage = createTtlCache<string>(CACHE_TTL_MS);
-    private readonly cacheLang = createTtlCache<string[][]>(CACHE_TTL_MS);
+    private readonly cacheLang = createTtlCache<SeasonLinks>(CACHE_TTL_MS);
 
     getSettings(): Settings {
         return {
@@ -109,15 +141,16 @@ export class Provider implements AnimeProvider {
         const html = await fetchForm(`${WEBSITE}/template-php/defaut/fetch.php`, { query: opts.query });
         if (!html) return [];
 
-        const animes = getBlocksByClass(html, "asn-search-result", "a").flatMap((block) => {
-            const href = getTagAttr(block, "href");
-            const meta = getTextByClass(block, "asn-search-meta", "p") ?? "";
-            const titleBlock = getBlocksByClass(block, "asn-search-result-title", "h3", 1)[0];
-            const title = titleBlock ? stripTags(titleBlock.replace(MARK_TAIL_RE, "$1</mark>$2").replace(MARK_HEAD_RE, "$1<mark>$2"), "") : "";
+        const animes: { url: string; title: string }[] = [];
 
-            if (!href || !title || !ANIME_META_RE.test(meta)) return [];
+        LoadDoc(html)("a.asn-search-result").each((_, block) => {
+            const href = block.attr("href");
+            const meta = getText(block.find("p.asn-search-meta").first());
+            const title = searchTitle(block.find("h3.asn-search-result-title").first());
 
-            return [{ url: resolveUrl(href, `${WEBSITE}/`), title }];
+            if (!href || !title || !ANIME_META_RE.test(meta)) return;
+
+            animes.push({ url: resolveUrl(href, `${WEBSITE}/`), title });
         });
 
         const groups = await Promise.all(animes.map((anime) => this.findSeasons(anime.url, anime.title)));
@@ -134,8 +167,8 @@ export class Provider implements AnimeProvider {
         const season = splitSeasonPath(id);
         if (!season) return [];
 
-        const lists = await this.loadLang(season.base, season.lang);
-        const count = Math.max(0, ...(lists ?? []).map((list) => list.length));
+        const links = await this.loadLang(season.base, season.lang);
+        const count = Math.max(0, ...(links?.lists ?? []).map((list) => list.length));
 
         return Array.from({ length: count }, (_, index) => {
             const number = season.start + index;
@@ -150,11 +183,20 @@ export class Provider implements AnimeProvider {
 
         const serversMap = await this.getServers(episodeInfo);
 
-        return resolveEpisodeServer(serversMap, server, (name, entry) => extract(name, entry.url, entry.label.toUpperCase()), hasExtractor);
+        return resolveEpisodeServer(
+            serversMap,
+            server,
+            async (name, { id, lang }) => {
+                const url = await this.resolveLink(episodeInfo.base, lang, id);
+
+                return url ? extract(name, url, lang.toUpperCase()) : noSources();
+            },
+            hasExtractor,
+        );
     }
 
-    private fetchPage(url: string, referer?: string): Promise<string | null> {
-        return this.cachePage(url, () => fetchText(url, referer ? { headers: { Referer: referer } } : undefined));
+    private fetchPage(url: string): Promise<string | null> {
+        return this.cachePage(url, () => fetchText(url));
     }
 
     private async findSeasons(catalogueUrl: string, title: string): Promise<SearchResult[]> {
@@ -162,11 +204,13 @@ export class Provider implements AnimeProvider {
         if (!html) return [];
 
         const base = catalogueUrl.endsWith("/") ? catalogueUrl : `${catalogueUrl}/`;
-        const panels = getBlocksByClass(html, "oe-panneau", "a").flatMap((block) => {
-            const href = getTagAttr(block, "href");
-            if (!href || classTokens(block).includes("oe-panneau-scan")) return [];
+        const panels: { href: string; name: string | null; start: number }[] = [];
 
-            return [{ href, name: getTextByClass(block, "oe-panneau-nom", "span"), start: 1 }];
+        LoadDoc(html)("a.oe-panneau").each((_, block) => {
+            const href = block.attr("href");
+            if (!href || block.is(".oe-panneau-scan")) return;
+
+            panels.push({ href, name: getText(block.find("span.oe-panneau-nom").first()) || null, start: 1 });
         });
 
         const entries = panels.length > 0
@@ -192,49 +236,45 @@ export class Provider implements AnimeProvider {
         });
     }
 
-    private async getServers(episodeInfo: EpisodeId): Promise<ServersMap> {
+    private async getServers(episodeInfo: EpisodeId): Promise<Record<string, LinkEntry[]>> {
         const firstHtml = await this.fetchPage(pageUrl(episodeInfo.base, episodeInfo.lang));
         if (!firstHtml) return {};
 
         const langs = parseAvailableLangs(firstHtml);
         const lecteurs = parseLecteurs(firstHtml);
-        const targets = langs.length > 0 ? langs : [episodeInfo.lang];
+        const seasons = await Promise.all(
+            (langs.length > 0 ? langs : [episodeInfo.lang]).map(async (lang) => ({ lang, links: await this.loadLang(episodeInfo.base, lang) })),
+        );
 
-        const perLang = await Promise.all(targets.map((lang) => this.getLangServers(episodeInfo, lang, lecteurs)));
-        const map: ServersMap = {};
+        const servers: Record<string, LinkEntry[]> = {};
 
-        for (const [name, entry] of perLang.flat()) {
-            (map[name] ??= []).push(entry);
+        for (const { lang, links } of seasons) {
+            for (const list of links?.lists ?? []) {
+                const id = list[episodeInfo.index];
+                const host = id ? links?.meta[id]?.[0] : undefined;
+
+                if (id && host) (servers[serverNameFor(host, lecteurs)] ??= []).push({ id, lang });
+            }
         }
 
-        return map;
+        return servers;
     }
 
-    private loadLang(base: string, lang: string): Promise<string[][] | null> {
+    private loadLang(base: string, lang: string): Promise<SeasonLinks | null> {
         return this.cacheLang(`${base}/${lang}`, async () => {
-            const url = pageUrl(base, lang);
-            const html = await this.fetchPage(url);
-            if (!html) return null;
+            const html = await this.fetchPage(pageUrl(base, lang));
 
-            const scriptSrc = EPISODES_SCRIPT_RE.exec(html);
-            const src = scriptSrc?.[1] ?? scriptSrc?.[2];
-            if (!src) return null;
-
-            const jsUrl = resolveUrl(decodeEntities(src), url);
-            const js = await this.fetchPage(jsUrl, url);
-            if (!js) return null;
-
-            return parseEpisodeLists(js);
+            return html ? parseSeasonLinks(html) : null;
         });
     }
 
-    private async getLangServers(episodeInfo: EpisodeId, lang: string, lecteurs: LecteursInfos): Promise<[string, ServerEntry][]> {
-        const lists = await this.loadLang(episodeInfo.base, lang);
+    private async resolveLink(base: string, lang: string, id: string): Promise<string | null> {
+        const links = await this.loadLang(base, lang);
+        if (!links) return null;
 
-        return (lists ?? []).flatMap((list) => {
-            const url = list[episodeInfo.index];
-            const name = url ? serverNameFor(url, lecteurs) : null;
-            return url && name ? [[name, { url, label: lang }] as [string, ServerEntry]] : [];
-        });
+        const query = new URLSearchParams({ j: links.token, l: id }).toString();
+        const data = await fetchJson<{ u?: string }>(`${WEBSITE}/api/lien.php?${query}`, { noCloudflareBypass: true });
+
+        return data?.u ?? null;
     }
 }

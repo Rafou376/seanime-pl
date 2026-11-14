@@ -1,9 +1,7 @@
-import { getTagAttr } from "./attributes";
-import { openTags } from "./elements";
-
 const STYLE_URL_RE = /url\(\s*["']?([^"')]+?)["']?\s*\)/i;
 const SRCSET_CANDIDATE_RE = /(\S+?)(?:\s+(\d+(?:\.\d+)?)[wx]\s*(?:,|$)|\s*(?:,\s+|,?$))/g;
 const DATA_URL_RE = /^data:/i;
+const IMAGE_ATTRS = ["data-src", "data-lazy-src", "src"];
 
 function bestSrcsetUrl(srcset: string): string | null {
     let best: { url: string; weight: number } | null = null;
@@ -19,9 +17,9 @@ function bestSrcsetUrl(srcset: string): string | null {
     return best?.url ?? null;
 }
 
-export function getImageSource(tag: string, attrs: string[]): string | null {
+export function getImageSource(element: DocSelection, attrs: string[]): string | null {
     for (const name of attrs) {
-        const value = getTagAttr(tag, name);
+        const value = element.attr(name);
         if (!value) continue;
 
         const url = name === "style" ? STYLE_URL_RE.exec(value)?.[1] : name.endsWith("srcset") ? bestSrcsetUrl(value) : value;
@@ -31,11 +29,6 @@ export function getImageSource(tag: string, attrs: string[]): string | null {
     return null;
 }
 
-export function getImageUrl(html: string, tag: string = "img"): string | null {
-    for (const match of openTags(html, tag)) {
-        const url = getImageSource(match[0], ["data-src", "data-lazy-src", "src"]);
-        if (url) return url;
-    }
-
-    return null;
+export function getImageUrl(element: DocSelection): string | null {
+    return getImageSource(element, IMAGE_ATTRS);
 }

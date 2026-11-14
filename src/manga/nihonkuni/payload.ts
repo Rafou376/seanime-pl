@@ -17,7 +17,7 @@ export class Provider extends FMReader {
     protected override readonly chapterNameClass = "chapter-name";
     protected override readonly chapterTimeClass = "chapter-time";
 
-    protected override readonly pageImagePattern = /\sid\s*=\s*["'][^"']*page\d+/i;
+    protected override readonly pageImageSelector = "img[id*='page']";
     protected override readonly pageImageAttrs = ["src"];
 
     protected override chapterListUrl(id: string): string {

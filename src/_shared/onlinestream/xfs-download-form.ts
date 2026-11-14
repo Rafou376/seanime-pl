@@ -1,20 +1,22 @@
-import { getInputValue, getLinkHrefByClass } from "../core/html";
 import { fetchForm, fetchText } from "../core/http";
 
 export function parseDownloadForm(html: string, fallbackId: string | undefined, extraFields: string[] = []): Record<string, string> | null {
-    const hash = getInputValue(html, "hash");
-    const id = getInputValue(html, "id") || fallbackId;
+    const $ = LoadDoc(html);
+    const inputValue = (name: string): string | undefined => $(`input[name="${name}"][value]`).first().attr("value");
+
+    const hash = inputValue("hash");
+    const id = inputValue("id") || fallbackId;
     if (!hash || !id) return null;
 
     const fields: Record<string, string> = {
-        op: getInputValue(html, "op") || "download_orig",
+        op: inputValue("op") || "download_orig",
         id,
-        mode: getInputValue(html, "mode") || "n",
+        mode: inputValue("mode") || "n",
         hash,
     };
 
     for (const name of extraFields) {
-        const value = getInputValue(html, name);
+        const value = inputValue(name);
         if (value) fields[name] = value;
     }
 
@@ -30,5 +32,5 @@ export async function fetchDirectDownloadUrl(formUrl: string, videoId: string, l
 
     const result = await fetchForm(formUrl, fields);
 
-    return result ? getLinkHrefByClass(result, linkClassName) : null;
+    return result ? (LoadDoc(result)(`a.${linkClassName}[href]`).first().attr("href") ?? null) : null;
 }

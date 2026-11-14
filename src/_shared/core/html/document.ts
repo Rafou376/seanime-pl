@@ -1,28 +1,17 @@
-import { ATTR_VALUE } from "./attributes";
-import { extractElementText } from "./elements";
-import { cachedRegex } from "./regex";
-import { decodeEntities } from "./text";
+export function toArray(selection: DocSelection): DocSelection[] {
+    const items: DocSelection[] = [];
 
-export type Anchor = { href: string; content: string };
-const ANCHOR_RE = /<a\b[^>]*?\shref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a\s*>/gi;
-const SCRIPT_RE = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    selection.each((_, item) => {
+        items.push(item);
+    });
 
-export function getFirstLink(html: string, tag: string = "a"): { href: string; text: string } | null {
-    const match = cachedRegex(`<(${tag})\\b[^>]*\\shref\\s*=\\s*${ATTR_VALUE}[^>]*>`, "i").exec(html);
-    if (!match) return null;
-
-    return { href: decodeEntities(match[2] ?? match[3] ?? ""), text: extractElementText(html, match) ?? "" };
+    return items;
 }
 
-export function getAnchors(html: string): Anchor[] {
-    return [...html.matchAll(ANCHOR_RE)].map((match) => ({ href: decodeEntities(match[1] ?? match[2] ?? ""), content: match[3] ?? "" }));
-}
+export function scriptContaining(html: string, needle: string | RegExp): string | null {
+    const script = LoadDoc(html)("script")
+        .filter((_, element) => (typeof needle === "string" ? element.text().includes(needle) : needle.test(element.text())))
+        .first();
 
-export function scriptContaining(html: string, needle: string): string | null {
-    for (const match of html.matchAll(SCRIPT_RE)) {
-        const body = match[1];
-        if (body?.includes(needle)) return body;
-    }
-
-    return null;
+    return script.length() > 0 ? script.text() : null;
 }

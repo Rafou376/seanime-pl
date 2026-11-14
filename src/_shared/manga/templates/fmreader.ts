@@ -1,7 +1,7 @@
 import { WEBSITE } from "virtual:website";
 import { relativeDateIso, utcIso } from "../../core/dates";
-import { getAnchors, getBlockByClass, getBlocksByClass, getFirstLink, getImageSource, getTextByClass, stripTags, type Anchor } from "../../core/html";
-import { cookieHeader, fetchResponse, parseSetCookie } from "../../core/http";
+import { getImageSource, getText, toArray } from "../../core/html";
+import { cookieHeader, fetchResponse } from "../../core/http";
 import { absUrl, relativePath } from "../../core/url";
 import { ANY_NUMBER_RE, matchChapterNumber, sortChapters } from "../provider-helpers";
 
@@ -12,7 +12,6 @@ type Page = {
 
 const IMG_ATTRS = ["data-original", "data-src", "data-lazy-src", "data-bg", "data-srcset", "data-lazy-srcset", "style", "src", "srcset"];
 
-const IMG_TAG_RE = /<img\b[^>]*>/gi;
 const ABSOLUTE_DATE_RE = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
 const EXTENSION_RE = /\.[a-z]+$/i;
 const TRAILING_NUMBER_RE = /(\d+(?:\.\d+)?)(?=\D*$)/;
@@ -35,7 +34,7 @@ export abstract class FMReader implements MangaProvider {
     protected readonly dateValueIndex: number = 0;
     protected readonly dateWordIndex: number = 1;
 
-    protected readonly pageImagePattern: RegExp = /\sclass\s*=\s*["'][^"']*\bchapter-img\b/i;
+    protected readonly pageImageSelector: string = "img.chapter-img";
     protected readonly pageImageAttrs: string[] = IMG_ATTRS;
 
     getSettings(): Settings {
@@ -113,9 +112,7 @@ export abstract class FMReader implements MangaProvider {
         if (!res) return null;
 
         try {
-            const html = await res.text();
-
-            return { html, cookies: { ...sessionCookies, ...parseSetCookie(res) } };
+            return { html: res.text(), cookies: { ...sessionCookies, ...res.cookies } };
         } catch {
             return null;
         }
@@ -129,60 +126,63 @@ export abstract class FMReader implements MangaProvider {
         return absUrl(url.trim(), pageUrl);
     }
 
-    private scoped(html: string, className: string | null): string {
-        return className ? getBlocksByClass(html, className).join("") : html;
+    private within(className: string | null): string {
+        return className ? `.${className} ` : "";
     }
 
     private parseSearch(html: string, pageUrl: string): SearchResult[] {
         const results: SearchResult[] = [];
 
-        for (const card of getBlocksByClass(this.scoped(html, this.mangaListClass), this.mangaCardClass)) {
-            const titleBlock = getBlockByClass(card, this.mangaTitleClass);
-            const link = titleBlock ? getFirstLink(titleBlock) : null;
-            if (!link?.text) continue;
+        LoadDoc(html)(`${this.within(this.mangaListClass)}.${this.mangaCardClass}`).each((_, card) => {
+            const link = card.find(`.${this.mangaTitleClass} a[href], a.${this.mangaTitleClass}[href]`).first();
+            const title = getText(link);
+            const href = link.attr("href");
+            if (!title || href === undefined) return;
 
             results.push({
-                id: relativePath(this.resolve(link.href, pageUrl)),
-                title: link.text,
+                id: relativePath(this.resolve(href, pageUrl)),
+                title,
                 image: this.coverUrl(card, pageUrl),
             });
-        }
+        });
 
         return results;
     }
 
-    private coverUrl(card: string, pageUrl: string): string | undefined {
-        const cover = getBlockByClass(card, this.mangaCoverClass) ?? card.match(IMG_TAG_RE)?.[0];
+    private coverUrl(card: DocSelection, pageUrl: string): string | undefined {
+        const block = card.find(`.${this.mangaCoverClass}`).first();
+        const cover = block.length() > 0 ? block : card.find("img").first();
 
-        return cover ? this.imgAttr(cover, IMG_ATTRS, pageUrl) : undefined;
+        return cover.length() > 0 ? this.imgAttr(cover, IMG_ATTRS, pageUrl) : undefined;
     }
 
-    private pageAnchors(html: string): Anchor[] {
-        return getAnchors(this.scoped(html, this.chapterListClass));
+    private pageAnchors(html: string): DocSelection[] {
+        return toArray(LoadDoc(html)(`${this.within(this.chapterListClass)}a[href]`));
     }
 
-    private fragmentAnchors(html: string): Anchor[] {
+    private fragmentAnchors(html: string): DocSelection[] {
         const anchors = this.pageAnchors(html);
         if (anchors.length > 0 || this.chapterListClass === null) return anchors;
 
         const nameClass = this.chapterNameClass;
 
-        return getAnchors(html).filter(({ content }) => !nameClass || getTextByClass(content, nameClass) !== null);
+        return toArray(LoadDoc(html)("a[href]"))
+            .filter((anchor) => !nameClass || getText(anchor.find(`.${nameClass}`).first()) !== "");
     }
 
-    private parseChapters(anchors: Anchor[], pageUrl: string): ChapterDetails[] {
+    private parseChapters(anchors: DocSelection[], pageUrl: string): ChapterDetails[] {
         const linkBase = this.chapterLinkBase(pageUrl);
         const chapters: Omit<ChapterDetails, "index">[] = [];
         const seen = new Set<string>();
 
-        for (const { href, content } of anchors) {
-            const id = relativePath(this.resolve(href, linkBase));
+        for (const anchor of anchors) {
+            const id = relativePath(this.resolve(anchor.attr("href") ?? "", linkBase));
             if (!id || seen.has(id)) continue;
             seen.add(id);
 
-            const name = this.chapterNameClass ? (getTextByClass(content, this.chapterNameClass) ?? "") : stripTags(content) || id;
+            const name = this.chapterNameClass ? getText(anchor.find(`.${this.chapterNameClass}`).first()) : getText(anchor) || id;
             const chapter = this.chapterNumber(name, id);
-            const time = getTextByClass(content, this.chapterTimeClass);
+            const time = getText(anchor.find(`.${this.chapterTimeClass}`).first());
 
             chapters.push({
                 id,
@@ -200,17 +200,15 @@ export abstract class FMReader implements MangaProvider {
         const headers = this.buildHeaders({ Referer: pageUrl });
         const pages: ChapterPage[] = [];
 
-        for (const tag of html.match(IMG_TAG_RE) ?? []) {
-            if (!this.pageImagePattern.test(tag)) continue;
-
-            const url = this.imgAttr(tag, this.pageImageAttrs, pageUrl);
+        LoadDoc(html)(this.pageImageSelector).each((_, img) => {
+            const url = this.imgAttr(img, this.pageImageAttrs, pageUrl);
             if (url) pages.push({ url, index: pages.length, headers });
-        }
+        });
 
         return pages;
     }
 
-    private imgAttr(element: string, attrs: string[], pageUrl: string): string | undefined {
+    private imgAttr(element: DocSelection, attrs: string[], pageUrl: string): string | undefined {
         const url = getImageSource(element, attrs);
 
         return url ? this.resolve(url, pageUrl) : undefined;

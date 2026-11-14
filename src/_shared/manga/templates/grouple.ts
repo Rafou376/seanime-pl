@@ -1,7 +1,7 @@
 import { WEBSITE } from "virtual:website";
 import { memoizeAsync } from "../../core/cache";
 import { utcIso } from "../../core/dates";
-import { getAttrByClass, getBlocksByClass, getLinkHrefByClass, getTextByClass, scriptContaining, stripTags } from "../../core/html";
+import { getText, scriptContaining } from "../../core/html";
 import { fetchJson, fetchText } from "../../core/http";
 import { absUrl, isAbsoluteUrl, trimLeadingSlashes } from "../../core/url";
 import { sortChapters } from "../provider-helpers";
@@ -65,23 +65,21 @@ export abstract class GroupLe implements MangaProvider {
         const html = await this.fetchHtml(`${WEBSITE}/${trimLeadingSlashes(id)}`);
         if (!html || html.includes("Запрещена публикация произведения по копирайту")) return [];
 
-        const title = getTextByClass(html, "cr-hero-names__main") ?? "";
+        const $ = LoadDoc(html);
+        const title = getText($(".cr-hero-names__main").first());
         const searchParams = this.chapterSearchParams(html);
 
         const chapters: Omit<ChapterDetails, "index">[] = [];
 
-        for (const row of getBlocksByClass(html, "item-row", "tr")) {
-            const href = getLinkHrefByClass(row, "chapter-link", "a");
-            if (!href) continue;
+        $("tr.item-row").each((_, row) => {
+            const href = row.find("a.chapter-link[href]").first().attr("href");
+            if (!href) return;
 
-            const parsedNumber = parseFloat(getAttrByClass(row, "item-title", "data-num", "td") ?? "");
+            const parsedNumber = parseFloat(row.find("td.item-title[data-num]").first().attr("data-num") ?? "");
             const chapterNumber = String(Number.isFinite(parsedNumber) ? parsedNumber / 10 : 0);
 
-            const scanlator = this.scanlatorFromTitle(getAttrByClass(row, "chapter-link", "title", "a"));
-            const name = this.cleanChapterName(getTextByClass(row, "chapter-link", "a") ?? href, title, chapterNumber);
-
-            const lastDateCell = getBlocksByClass(row, "d-none", "td").pop();
-            const dateText = lastDateCell ? stripTags(lastDateCell) : null;
+            const scanlator = this.scanlatorFromTitle(row.find("a.chapter-link[title]").first().attr("title"));
+            const name = this.cleanChapterName(getText(row.find("a.chapter-link").first()) || href, title, chapterNumber);
 
             const chapterId = this.chapterId(href, searchParams);
 
@@ -91,9 +89,9 @@ export abstract class GroupLe implements MangaProvider {
                 title: name || `Глава ${chapterNumber}`,
                 chapter: chapterNumber,
                 scanlator,
-                updatedAt: this.parseChapterDate(dateText),
+                updatedAt: this.parseChapterDate(getText(row.find("td.d-none").last())),
             });
-        }
+        });
 
         return sortChapters(chapters);
     }
@@ -227,7 +225,7 @@ export abstract class GroupLe implements MangaProvider {
         return `${path}${searchParams}`;
     }
 
-    private scanlatorFromTitle(raw: string | null): string | undefined {
+    private scanlatorFromTitle(raw: string | undefined): string | undefined {
         if (!raw) return undefined;
 
         const scanlator = raw

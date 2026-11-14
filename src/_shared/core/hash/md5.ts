@@ -18,22 +18,6 @@ const CONSTANTS = [
     0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
 ];
 
-function utf8Bytes(text: string): number[] {
-    const bytes: number[] = [];
-    const encoded = encodeURIComponent(text);
-
-    for (let i = 0; i < encoded.length; i++) {
-        if (encoded[i] === "%") {
-            bytes.push(parseInt(encoded.slice(i + 1, i + 3), 16));
-            i += 2;
-        } else {
-            bytes.push(encoded.charCodeAt(i));
-        }
-    }
-
-    return bytes;
-}
-
 function wordToHex(word: number): string {
     let out = "";
 
@@ -46,7 +30,7 @@ function wordToHex(word: number): string {
 }
 
 export function md5(input: string): string {
-    const bytes = utf8Bytes(input);
+    const bytes = Array.from($toBytes(input));
     const bitLength = bytes.length * 8;
 
     bytes.push(0x80);

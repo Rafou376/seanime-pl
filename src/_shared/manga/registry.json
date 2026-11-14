@@ -1,17 +1,17 @@
 {
     "origines": {
-        "version": 4
+        "version": 5
     },
     "libgroup": {
-        "version": 4
+        "version": 5
     },
     "grouple": {
-        "version": 3
+        "version": 4
     },
     "fmreader": {
-        "version": 2
+        "version": 3
     },
     "mangataro": {
-        "version": 1
+        "version": 2
     }
 }

@@ -185,12 +185,12 @@ export abstract class MangaTaro implements MangaProvider {
             const res = await fetch(this.chapterListUrl(mangaId, offset), { headers: this.headers() });
 
             if (!res.ok) {
-                const serverTime = Date.parse(res.headers.get("date") ?? "");
+                const serverTime = Date.parse(res.headers["Date"] ?? res.headers["date"] ?? "");
 
                 return { status: res.status, data: null, serverTime: Number.isNaN(serverTime) ? null : serverTime };
             }
 
-            return { status: res.status, data: parseJson<ChapterListResponse>(await res.text()), serverTime: null };
+            return { status: res.status, data: parseJson<ChapterListResponse>(res.text()), serverTime: null };
         } catch {
             return { status: 0, data: null, serverTime: null };
         }

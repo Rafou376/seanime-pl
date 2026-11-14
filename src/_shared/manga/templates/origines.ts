@@ -1,6 +1,6 @@
 import { WEBSITE } from "virtual:website";
 import { utcIso } from "../../core/dates";
-import { getAttrByClass, getBlocksByClass, getImageUrl, getLinkHrefByClass, getTextByClassPrefix } from "../../core/html";
+import { getImageUrl, getTextByClassPrefix } from "../../core/html";
 import { fetchForm, fetchText } from "../../core/http";
 import { parseJson } from "../../core/json";
 import { absUrl, relativePath } from "../../core/url";
@@ -75,16 +75,16 @@ export abstract class Origines implements MangaProvider {
     private parseChapters(html: string, mangaId: string): ChapterDetails[] {
         const chapters: Omit<ChapterDetails, "index">[] = [];
 
-        for (const block of getBlocksByClass(html, "ori-chl-row", "div")) {
-            const href = getLinkHrefByClass(block, "ori-chl-corps");
-            if (!href) continue;
+        LoadDoc(html)("div.ori-chl-row").each((_, block) => {
+            const href = block.find("a.ori-chl-corps[href]").first().attr("href");
+            if (!href) return;
 
             const chapterSlug = pathSegments(href).pop();
-            if (!chapterSlug) continue;
+            if (!chapterSlug) return;
 
             const id = `${mangaId}/${chapterSlug}`;
             const name = getTextByClassPrefix(block, "ori-chl-nom") ?? getTextByClassPrefix(block, "ori-chl") ?? id;
-            const dateTitle = getAttrByClass(block, "ori-chl-date", "title", "span");
+            const dateTitle = block.find("span.ori-chl-date[title]").first().attr("title");
 
             chapters.push({
                 id,
@@ -93,25 +93,26 @@ export abstract class Origines implements MangaProvider {
                 chapter: matchChapterNumber(name) ?? name,
                 updatedAt: this.parseChapterDate(dateTitle),
             });
-        }
+        });
 
         return sortChapters(chapters);
     }
 
     private parsePages(chapterHtml: string): ChapterPage[] {
         const referer = `${WEBSITE}/${this.mangaPath}/`;
+        const pages: ChapterPage[] = [];
 
-        return getBlocksByClass(chapterHtml, "wp-manga-chapter-img", "img")
-            .map((block) => getImageUrl(block)?.trim())
-            .filter((url): url is string => !!url)
-            .map((url, index) => ({
-                url: absUrl(url, WEBSITE),
-                index,
-                headers: { Referer: referer },
-            }));
+        LoadDoc(chapterHtml)("img.wp-manga-chapter-img").each((_, img) => {
+            const url = getImageUrl(img)?.trim();
+            if (!url) return;
+
+            pages.push({ url: absUrl(url, WEBSITE), index: pages.length, headers: { Referer: referer } });
+        });
+
+        return pages;
     }
 
-    private parseChapterDate(date: string | null): string | undefined {
+    private parseChapterDate(date: string | undefined): string | undefined {
         if (!date) return undefined;
 
         const match = date.match(CHAPTER_DATE_RE);
