@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/github/license/Rafou376/seanime-pl?labelColor=182a44&color=DEDEDE)](/LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Rafou376/seanime-pl/build.yml?labelColor=182a44)](https://github.com/Rafou376/seanime-pl/actions/workflows/build.yml)
 
-A collection of extensions for [Seanime](https://seanime.app).  
+A collection of extensions for [Seanime](https://seanime.app), available through the [community marketplace](https://github.com/Bas1874/Seanime-Marketplace).  
 To request a new extension or report a bug, please [open an issue](https://github.com/Rafou376/seanime-pl/issues/new).
 
 ## Setup
