@@ -1,6 +1,6 @@
 import { WEBSITE } from "virtual:website";
 import { relativeDateIso } from "../../core/dates";
-import { md5 } from "../../core/hash/md5";
+import { md5 } from "../../core/encoding";
 import { decodeEntities } from "../../core/html";
 import { fetchJson } from "../../core/http";
 import { parseJson } from "../../core/json";

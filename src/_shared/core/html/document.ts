@@ -15,3 +15,9 @@ export function scriptContaining(html: string, needle: string | RegExp): string 
 
     return script.length() > 0 ? script.text() : null;
 }
+
+export function firstText(html: string, selector: string): string | null {
+    const script = LoadDoc(html)(selector).first();
+
+    return script.length() > 0 ? script.text() : null;
+}

@@ -13,5 +13,10 @@
         "version": 1,
         "file": "vidmoly",
         "export": "extractVidmoly"
+    },
+    "voe": {
+        "version": 1,
+        "file": "voe",
+        "export": "extractVoe"
     }
 }
