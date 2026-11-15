@@ -1,5 +1,4 @@
 import { EXTRACTORS, EXTRACTOR_ALIASES } from "virtual:extractors-map";
-import { fetchResponse } from "../../core/http";
 import { noSources } from "../provider-helpers";
 
 const EXTRACTOR_BY_NAME = new Map<string, Extractor>([
@@ -23,19 +22,7 @@ export function hasExtractor(serverName: string): boolean {
     return findExtractor(serverName) !== undefined;
 }
 
-async function isReachable(url: string, headers: Record<string, string>): Promise<boolean> {
-    if (await fetchResponse(url, { method: "HEAD", headers })) return true;
-
-    return (await fetchResponse(url, { method: "GET", headers: { ...headers, Range: "bytes=0-0" } })) !== null;
-}
-
 export async function extract(serverName: string, playerUrl: string, label: string): Promise<ExtractorResult> {
     const extractor = findExtractor(serverName);
-    if (!extractor) return noSources();
-
-    const result = await extractor(playerUrl, label);
-    const headers = result.headers ?? {};
-    const reachable = await Promise.all(result.sources.map((source) => isReachable(source.url, headers)));
-
-    return { ...result, sources: result.sources.filter((_, index) => reachable[index]) };
+    return extractor ? extractor(playerUrl, label) : noSources();
 }
