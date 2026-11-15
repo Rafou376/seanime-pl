@@ -1,6 +1,7 @@
 import { WEBSITE } from "virtual:website";
 import { memoizeAsync } from "../../core/cache";
 import { fetchJson } from "../../core/http";
+import { withQuery } from "../../core/url";
 import { sortChapters } from "../provider-helpers";
 
 type MangaShort = {
@@ -61,14 +62,13 @@ export abstract class LibGroup implements MangaProvider {
     }
 
     async search(opts: QueryOptions): Promise<SearchResult[]> {
-        const url = new URL(`${this.apiUrl}/api/manga`);
+        const url = withQuery(`${this.apiUrl}/api/manga`, {
+            page: "1",
+            "site_id[]": String(this.siteId),
+            ...(opts.query ? { q: opts.query } : {}),
+        });
 
-        url.searchParams.set("page", "1");
-        url.searchParams.append("site_id[]", String(this.siteId));
-
-        if (opts.query) url.searchParams.set("q", opts.query);
-
-        const json = await this.fetchApi<MangasPage>(url.toString());
+        const json = await this.fetchApi<MangasPage>(url);
 
         return (json?.data ?? []).map((manga) => ({
             id: manga.slug_url,

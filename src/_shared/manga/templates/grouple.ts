@@ -3,7 +3,7 @@ import { memoizeAsync } from "../../core/cache";
 import { utcIso } from "../../core/dates";
 import { getText, scriptContaining } from "../../core/html";
 import { fetchJson, fetchText } from "../../core/http";
-import { absUrl, isAbsoluteUrl, trimLeadingSlashes } from "../../core/url";
+import { absUrl, isAbsoluteUrl, pathOf, queryParam, trimLeadingSlashes, withQuery } from "../../core/url";
 import { sortChapters } from "../provider-helpers";
 
 type SearchResponse = {
@@ -45,14 +45,13 @@ export abstract class GroupLe implements MangaProvider {
     }
 
     async search(opts: QueryOptions): Promise<SearchResult[]> {
-        const url = new URL(`${WEBSITE}/api/catalog/search`);
+        const url = withQuery(`${WEBSITE}/api/catalog/search`, {
+            offset: "0",
+            sortType: "RATING",
+            ...(opts.query ? { q: opts.query } : {}),
+        });
 
-        url.searchParams.set("offset", "0");
-        url.searchParams.set("sortType", "RATING");
-
-        if (opts.query) url.searchParams.set("q", opts.query);
-
-        const json = await fetchJson<SearchResponse>(url.toString(), { headers: this.apiHeaders() });
+        const json = await fetchJson<SearchResponse>(url, { headers: this.apiHeaders() });
 
         return (json?.list ?? []).map((item) => ({
             id: item.elementId.linkName,
@@ -81,7 +80,7 @@ export abstract class GroupLe implements MangaProvider {
             const scanlator = this.scanlatorFromTitle(row.find("a.chapter-link[title]").first().attr("title"));
             const name = this.cleanChapterName(getText(row.find("a.chapter-link").first()) || href, title, chapterNumber);
 
-            const chapterId = this.chapterId(href, searchParams);
+            const chapterId = `${isAbsoluteUrl(href) ? pathOf(href) : href}${searchParams}`;
 
             chapters.push({
                 id: chapterId,
@@ -98,7 +97,6 @@ export abstract class GroupLe implements MangaProvider {
 
     async findChapterPages(id: string): Promise<ChapterPage[]> {
         const url = await this.chapterUrl(id);
-        if (!url) return [];
 
         const html = await this.fetchHtml(url);
         if (!html) return [];
@@ -149,7 +147,7 @@ export abstract class GroupLe implements MangaProvider {
         return pages;
     }
 
-    private async chapterUrl(rawId: string): Promise<string | null> {
+    private async chapterUrl(rawId: string): Promise<string> {
         let value = rawId.trim();
 
         if (!value.includes("?") && value.includes("%3F")) {
@@ -158,22 +156,10 @@ export abstract class GroupLe implements MangaProvider {
             } catch {}
         }
 
-        let url: URL;
+        const url = isAbsoluteUrl(value) ? value : `${WEBSITE}/${trimLeadingSlashes(value)}`;
+        const hash = queryParam(url, "d") || (await this.resolveUserHash(pathOf(url)));
 
-        try {
-            url = new URL(isAbsoluteUrl(value) ? value : `${WEBSITE}/${trimLeadingSlashes(value)}`);
-        } catch {
-            return null;
-        }
-
-        url.searchParams.set("mtr", "true");
-
-        if (!url.searchParams.get("d")) {
-            const hash = await this.resolveUserHash(url.pathname);
-            if (hash) url.searchParams.set("d", hash);
-        }
-
-        return url.toString();
+        return withQuery(url, { mtr: "true", ...(hash ? { d: hash } : {}) });
     }
 
     private resolveUserHash(pathname: string): Promise<string | null> {
@@ -211,18 +197,6 @@ export abstract class GroupLe implements MangaProvider {
 
     private fetchHtml(url: string): Promise<string | null> {
         return fetchText(url, { headers: this.htmlHeaders() });
-    }
-
-    private chapterId(href: string, searchParams: string): string {
-        let path = href;
-
-        if (isAbsoluteUrl(href)) {
-            try {
-                path = new URL(href).pathname;
-            } catch {}
-        }
-
-        return `${path}${searchParams}`;
     }
 
     private scanlatorFromTitle(raw: string | undefined): string | undefined {

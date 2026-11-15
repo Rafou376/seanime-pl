@@ -12,20 +12,3 @@ declare class URLSearchParams {
     set(name: string, value: string): void
     toString(): string
 }
-
-declare class URL {
-    constructor(url: string, base?: string | URL)
-    hash: string
-    host: string
-    hostname: string
-    href: string
-    readonly origin: string
-    password: string
-    pathname: string
-    port: string
-    protocol: string
-    search: string
-    readonly searchParams: URLSearchParams
-    username: string
-    toString(): string
-}
