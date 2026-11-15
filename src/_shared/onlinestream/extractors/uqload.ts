@@ -1,7 +1,7 @@
 import { getText } from "../../core/html";
 import { fetchForm, fetchText } from "../../core/http";
 import { absUrl, originOf } from "../../core/url";
-import { noSources } from "../provider-helpers";
+import { noSources, videoSource } from "../provider-helpers";
 import { parseDownloadForm } from "../xfs-download-form";
 
 const VIDEO_ID_RE = /(?:embed-|\/d\/)([a-zA-Z0-9_-]+)/;
@@ -16,7 +16,7 @@ function extractQualities(html: string, baseUrl: string): { url: string; resolut
 
         const name = getText(row.find("span.pg-dlv__q").first());
         const size = getText(row.find("span.pg-dlv__meta").first()).match(DIMENSIONS_RE)?.[0];
-        const resolution = name && size ? `${name} (${size})` : name || size || "Auto";
+        const resolution = name && size ? `${name} (${size})` : name || size || "";
 
         qualities.push({ url: absUrl(href, baseUrl), resolution });
     });
@@ -41,13 +41,7 @@ async function resolveQuality(qualityUrl: string, resolution: string, label: str
     const mp4Url = LoadDoc(resultHtml)("a.download-btn[href]").first().attr("href");
     if (!mp4Url) return null;
 
-    return {
-        url: mp4Url,
-        type: "mp4",
-        quality: `${resolution} - ${label}`,
-        label,
-        subtitles: [],
-    };
+    return videoSource("mp4", mp4Url, label, resolution);
 }
 
 export async function extractUqload(playerUrl: string, label: string): Promise<ExtractorResult> {

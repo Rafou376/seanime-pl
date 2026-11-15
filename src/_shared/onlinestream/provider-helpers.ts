@@ -9,6 +9,10 @@ export function noSources(): ExtractorResult {
     return { sources: [] };
 }
 
+export function videoSource(type: VideoSourceType, url: string, label: string, quality?: string | null): VideoSource {
+    return { url, type, quality: `${quality || "Auto"} - ${label}`, label, subtitles: [] };
+}
+
 export function emptyServer(server: string): EpisodeServer {
     return { server, headers: {}, videoSources: [] };
 }
