@@ -114,12 +114,14 @@ function parseLecteurs(html: string): LecteursInfos {
 
 function parseSeasonLinks(html: string): SeasonLinks | null {
     const script = scriptContaining(html, EPS_DECL_RE);
-    const token = script ? EPS_TOKEN_RE.exec(script)?.[2] : undefined;
-    if (!script || !token) return null;
+    if (!script) return null;
 
     const source = script.replace(JS_TOKEN_RE, (match) => (match.startsWith("/") ? "" : match));
+    const token = EPS_TOKEN_RE.exec(source)?.[2];
+    if (!token) return null;
+
     const lists = [...source.matchAll(EPS_ARRAY_RE)].map(([, body = ""]) => [...body.matchAll(QUOTED_RE)].map(([, , ref = ""]) => LINK_REF_RE.exec(ref)?.[1] ?? ""));
-    const meta = parseJson<Record<string, string[]>>(EPS_META_RE.exec(script)?.[1] ?? "") ?? {};
+    const meta = parseJson<Record<string, string[]>>(EPS_META_RE.exec(source)?.[1] ?? "") ?? {};
 
     return { lists, meta, token };
 }
